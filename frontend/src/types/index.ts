@@ -169,6 +169,11 @@ export interface AnalyticsSummary {
   by_venue: Record<string, number>;
   slo_breaching: number;
   slo_total: number;
+  burn_page_alerts?: number;
+  burn_ticket_alerts?: number;
+  burn_active_acks?: number;
+  burn_active_silences?: number;
+  burn_suppression_ratio?: number;
 }
 
 export interface VenueAnalytics {

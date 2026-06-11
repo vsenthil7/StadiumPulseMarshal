@@ -162,6 +162,11 @@ export const apiExt = {
       active_acks: number; active_silences: number;
       most_silenced: { target: string; ack: number; silence: number }[];
     }>(`/slo/burn-stats?hours=${hours}`),
+  getBurnTrend: (hours = 24, buckets = 12) =>
+    http<{
+      window_hours: number; bucket_width_seconds: number;
+      buckets: { index: number; ack: number; silence: number; unack: number; unsilence: number; start_epoch: number }[];
+    }>(`/slo/burn-trend?hours=${hours}&buckets=${buckets}`),
   getOnCall: () =>
     http<{
       roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];

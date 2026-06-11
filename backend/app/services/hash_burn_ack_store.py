@@ -1,13 +1,11 @@
-"""Hash-backed burn-alert ack/silence store.
+"""Hash-backed burn-alert ack/silence store (KV-backed, multi-instance).
 
-Improves on the single-JSON-document ``SharedBurnAckStore`` by keeping each
-``(slo_id, severity)`` entry in its own hash field, so acknowledging one alert
-never rewrites another's state — eliminating the last-write-wins window across
-fields. Acks and silences live in two hashes (``burn:acks`` / ``burn:silences``);
-each field value is a small JSON blob carrying the expiry, pruned lazily on read.
-
-Same async surface as ``SharedBurnAckStore``; backed by any ``KVBackend`` with
-hash ops (Memory or Redis).
+Each ``(slo_id, severity)`` entry lives in its own hash field, so acknowledging
+one alert never rewrites another's state — there is no whole-document
+last-write-wins window across fields. Acks and silences live in two hashes
+(``burn:acks`` / ``burn:silences``); each field value is a small JSON blob
+carrying the expiry, pruned lazily on read. Backed by any ``KVBackend`` with hash
+ops (Memory or Redis), so state is shared across replicas.
 """
 from __future__ import annotations
 
@@ -110,8 +108,9 @@ class HashBurnAckStore:
     # --- summary -------------------------------------------------------------
     async def active_summary(self) -> dict:
         now = time.time()
-        acks_raw = await self._kv.hgetall(_ACKS)
-        sil_raw = await self._kv.hgetall(_SILENCES)
+        both = await self._kv.hgetall_many([_ACKS, _SILENCES])
+        acks_raw = both.get(_ACKS, {})
+        sil_raw = both.get(_SILENCES, {})
         acks = []
         for field, raw in acks_raw.items():
             try:

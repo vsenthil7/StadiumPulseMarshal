@@ -249,6 +249,24 @@ class AppContext:
             summary.burn_ticket_alerts = sum(
                 1 for a in alerts if a.severity.value == "ticket"
             )
+            # Suppression KPIs from the ack store + recent audit trail.
+            active = await self.burn_acks.active_summary()
+            summary.burn_active_acks = len(active["acks"])
+            summary.burn_active_silences = len(active["silences"])
+            from datetime import datetime, timezone
+
+            audit = await self.audit.query(resource_type="burn_alert", limit=10_000)
+            cutoff = datetime.now(timezone.utc).timestamp() - 24 * 3600
+            n_ack = n_sil = 0
+            for e in audit:
+                if e.at.timestamp() < cutoff:
+                    continue
+                if e.action == "burn.ack":
+                    n_ack += 1
+                elif e.action == "burn.silence":
+                    n_sil += 1
+            denom = n_ack + n_sil
+            summary.burn_suppression_ratio = round(n_sil / denom, 3) if denom else 0.0
         except Exception:  # noqa: BLE001 - analytics must not fail on alerting
             pass
         return summary

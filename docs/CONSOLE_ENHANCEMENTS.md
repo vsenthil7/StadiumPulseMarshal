@@ -645,3 +645,29 @@ On-call page so habitually-silenced (noisy) alerts stand out.
 
 ### Tests
 Backend **391 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 19 — Single ack-store path, pipelined summary, suppression trend, dashboard KPIs
+
+### One ack-store path
+The single-document `SharedBurnAckStore` was removed; `HashBurnAckStore`
+(per-field, multi-instance) is the only path.
+
+### Pipelined hash summary
+`KVBackend.hgetall_many` reads multiple hashes in one Redis pipeline round-trip
+(a loop on Memory), with a defensive bytes-decode for clients that don't apply
+`decode_responses` to pipelined replies. The ack-store summary uses it.
+
+### Suppression trend
+`GET /slo/burn-trend` buckets ack/silence counts over a window; the On-call page
+renders an inline SVG stacked-bar trend (acks vs silences) with a legend, beside
+the suppression ratio and most-silenced targets.
+
+### Burn KPIs on the analytics dashboard
+The analytics summary now carries burn alert counts, the suppression ratio, and
+active ack/silence counts; the dashboard's Operational analytics panel surfaces
+them, so burn health sits alongside incident and SLO metrics.
+
+### Tests
+Backend **391 pass**. Frontend `tsc -b` + `vite build` green; 7 node RBAC tests.

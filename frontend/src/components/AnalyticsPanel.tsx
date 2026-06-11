@@ -54,6 +54,21 @@ export function AnalyticsPanel({ summary }: { summary: AnalyticsSummary }) {
           label="SLOs breaching"
           value={`${summary.slo_breaching}/${summary.slo_total}`}
         />
+        {(summary.burn_page_alerts != null || summary.burn_ticket_alerts != null) && (
+          <Stat
+            label="Burn alerts (page/ticket)"
+            value={`${summary.burn_page_alerts ?? 0}/${summary.burn_ticket_alerts ?? 0}`}
+          />
+        )}
+        {summary.burn_suppression_ratio != null && (
+          <Stat
+            label="Suppression"
+            value={`${Math.round((summary.burn_suppression_ratio ?? 0) * 100)}%`}
+          />
+        )}
+        {summary.burn_active_silences != null && (
+          <Stat label="Active silences" value={summary.burn_active_silences} />
+        )}
       </div>
       <div className="bar-groups">
         <BarGroup title="By severity" data={summary.by_severity} />

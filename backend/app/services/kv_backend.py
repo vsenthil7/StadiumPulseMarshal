@@ -33,6 +33,7 @@ class KVBackend(Protocol):
     async def hget(self, key: str, field: str) -> str | None: ...
     async def hdel(self, key: str, field: str) -> bool: ...
     async def hgetall(self, key: str) -> dict[str, str]: ...
+    async def hgetall_many(self, keys: list[str]) -> dict[str, dict[str, str]]: ...
 
 
 class MemoryKV:
@@ -88,6 +89,9 @@ class MemoryKV:
     async def hgetall(self, key: str) -> dict[str, str]:
         return dict(self._hashes.get(key, {}))
 
+    async def hgetall_many(self, keys: list[str]) -> dict[str, dict[str, str]]:
+        return {k: dict(self._hashes.get(k, {})) for k in keys}
+
     async def close(self) -> None:
         return None
 
@@ -133,6 +137,23 @@ class RedisKV:
 
     async def hgetall(self, key: str) -> dict[str, str]:
         return await self._r.hgetall(key) or {}
+
+    async def hgetall_many(self, keys: list[str]) -> dict[str, dict[str, str]]:
+        # One round-trip for all hashes via a pipeline. Some clients don't apply
+        # decode_responses to pipelined replies, so decode bytes defensively.
+        async with self._r.pipeline(transaction=False) as pipe:
+            for k in keys:
+                pipe.hgetall(k)
+            results = await pipe.execute()
+
+        def _dec(v):
+            return v.decode() if isinstance(v, (bytes, bytearray)) else v
+
+        out: dict[str, dict[str, str]] = {}
+        for i, k in enumerate(keys):
+            raw = results[i] or {}
+            out[k] = {_dec(fk): _dec(fv) for fk, fv in raw.items()}
+        return out
 
     async def close(self) -> None:
         try:

@@ -3,6 +3,7 @@
 // Read-only operational reference, served from GET /oncall.
 import { useCallback, useEffect, useState } from 'react';
 import { apiExt } from '../api/client';
+import { SuppressionTrend } from '../components/SuppressionTrend';
 
 interface OnCallData {
   roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
@@ -31,6 +32,7 @@ export function OnCallPage() {
   const [data, setData] = useState<OnCallData | null>(null);
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
+  const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
   const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +51,7 @@ export function OnCallPage() {
       .catch(() => ok && setData(null))
       .finally(() => ok && setLoading(false));
     apiExt.getBurnStats(24).then((s) => ok && setStats(s)).catch(() => ok && setStats(null));
+    apiExt.getBurnTrend(24, 12).then((t) => ok && setTrend(t.buckets)).catch(() => ok && setTrend([]));
     loadHistory('');
     return () => {
       ok = false;
@@ -178,6 +181,16 @@ export function OnCallPage() {
               <p className="hint">
                 Most silenced: {stats.most_silenced.slice(0, 3).map((m) => `${m.target} (${m.silence}×)`).join(', ')}
               </p>
+            )}
+            {trend.length > 0 && (
+              <div className="trend-wrap">
+                <div className="bar-group-title">Acks & silences over {Math.round(stats.window_hours ?? 24)}h</div>
+                <SuppressionTrend buckets={trend} />
+                <div className="trend-legend">
+                  <span className="legend-item"><span className="legend-swatch swatch-ack" /> acks</span>
+                  <span className="legend-item"><span className="legend-swatch swatch-sil" /> silences</span>
+                </div>
+              </div>
             )}
           </div>
         </div>

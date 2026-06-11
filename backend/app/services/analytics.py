@@ -24,6 +24,9 @@ class AnalyticsSummary(BaseModel):
     slo_total: int = 0
     burn_page_alerts: int = 0
     burn_ticket_alerts: int = 0
+    burn_active_acks: int = 0
+    burn_active_silences: int = 0
+    burn_suppression_ratio: float = 0.0
 
 
 def _mean(values: list[float]) -> float | None:

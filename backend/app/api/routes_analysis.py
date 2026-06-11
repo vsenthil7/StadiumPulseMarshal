@@ -86,6 +86,43 @@ async def slo_burn_events(
     return {"events": page, "total": total, "offset": offset, "limit": limit}
 
 
+@router.get("/slo/burn-trend", tags=["slo"])
+async def slo_burn_trend(
+    request: Request, hours: float = 24.0, buckets: int = 12,
+    _p: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Bucketed ack/silence counts over a trailing window (for a trend chart).
+
+    Splits the window into ``buckets`` equal slices, newest last, each carrying
+    the ack/silence/unack/unsilence counts that fall in it — a small time series
+    the On-call page renders as bars.
+    """
+    from datetime import datetime, timezone
+
+    ctx = _ctx(request)
+    entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
+    now = datetime.now(timezone.utc).timestamp()
+    span = hours * 3600
+    start = now - span
+    buckets = max(1, min(buckets, 60))
+    width = span / buckets
+    series = [
+        {"index": i, "ack": 0, "silence": 0, "unack": 0, "unsilence": 0,
+         "start_epoch": round(start + i * width, 1)}
+        for i in range(buckets)
+    ]
+    for e in entries:
+        ts = e.at.timestamp()
+        if ts < start or ts > now:
+            continue
+        idx = min(buckets - 1, int((ts - start) / width))
+        verb = e.action.replace("burn.", "")
+        if verb in ("ack", "silence", "unack", "unsilence"):
+            series[idx][verb] += 1
+    return {"window_hours": hours, "bucket_width_seconds": round(width, 1),
+            "buckets": series}
+
+
 @router.get("/slo/burn-stats", tags=["slo"])
 async def slo_burn_stats(
     request: Request, hours: float = 24.0,

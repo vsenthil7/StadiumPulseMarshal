@@ -917,3 +917,69 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **BB2:** docs + package.
 
 ### Round 18 — COMPLETE
+
+---
+
+## Round 19 — Remove dead store, pipelined hash summary, suppression trend + chart, burn-stats on dashboard
+
+### Track BC — single clear path (remove SharedBurnAckStore)
+| # | Sprint | Status |
+|---|--------|--------|
+| BC1 | Delete shared_burn_ack_store.py + its test; scrub doc refs | 🟢 |
+| BC2 | Confirm only HashBurnAckStore remains; suite green | 🟢 |
+
+### Track BD — Redis-pipelined hash summary
+| # | Sprint | Status |
+|---|--------|--------|
+| BD1 | KVBackend.hgetall_many(keys) pipelined (Redis) / loop (Memory) | 🟢 |
+| BD2 | HashBurnAckStore.active_summary uses one pipelined round-trip | 🟢 |
+| BD3 | Tests: pipelined multi-hash read parity (Memory + fakeredis) | 🟢 |
+
+### Track BE — suppression trend (time series) + chart
+| # | Sprint | Status |
+|---|--------|--------|
+| BE1 | /slo/burn-trend: bucketed ack/silence/dispatch counts over window | 🟢 |
+| BE2 | Frontend: suppression-trend sparkline/bars on On-call page | 🟢 |
+| BE3 | Tests: buckets aggregate correctly; empty window | 🟢 |
+
+### Track BF — burn-stats on the analytics dashboard
+| # | Sprint | Status |
+|---|--------|--------|
+| BF1 | AnalyticsSummary carries burn suppression KPIs (ratio, active) | 🟢 |
+| BF2 | AnalyticsPanel shows burn page/ticket + suppression KPIs | 🟢 |
+| BF3 | Tests: summary includes burn KPIs; tsc/build | 🟢 |
+
+### Track BG — supporting depth
+| # | Sprint | Status |
+|---|--------|--------|
+| BG1 | /slo/burn-trend venue-scoped; dashboard burn KPIs scoped | 🟢 |
+| BG2 | On-call suppression panel links trend + most-silenced | 🟢 |
+| BG3 | Tests + tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| BH1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| BH2 | Docs + package | 🟢 |
+
+### Round 19 changelog
+- **Track BC — single clear path:** removed shared_burn_ack_store.py and its test;
+  HashBurnAckStore is now the only ack-store path; docstring scrubbed.
+- **Track BD — pipelined hash summary:** KVBackend.hgetall_many (Redis pipeline,
+  one round-trip; Memory loop) with defensive bytes-decode (caught a real
+  pipeline-decode bug vs fakeredis). active_summary now uses one multi-hash read.
+  +3 tests (Memory + fakeredis parity).
+- **Track BE — suppression trend:** GET /slo/burn-trend buckets ack/silence/unack/
+  unsilence counts over a window; On-call page renders an inline SVG stacked-bar
+  trend with legend. +tests. Live-verified 12 buckets.
+- **Track BF — burn KPIs on dashboard:** AnalyticsSummary carries burn_active_acks/
+  burn_active_silences/burn_suppression_ratio (plus existing page/ticket counts);
+  AnalyticsPanel shows burn alerts, suppression %, active silences. +test.
+  Live-verified (ticket=1, active_silences=1, suppression=0.5).
+- **Track BG — depth:** trend + KPIs venue-scoped via the burn-alert path; On-call
+  suppression panel links trend + most-silenced.
+- **BH1:** backend **391 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **BH2:** docs + package.
+
+### Round 19 — COMPLETE
