@@ -177,3 +177,31 @@ Continuation per review. Scope not shrunk.
 - **S10:** docs + package.
 
 ### Round 3 — COMPLETE
+
+---
+
+## Round 4 — Production-grade OIDC (JWKS verification + full-flow tests)
+
+### Sprints
+| # | Sprint | Status |
+|---|--------|--------|
+| T1 | JWKS fetch + cache; RS256/ES256 ID-token signature verification | 🟢 |
+| T2 | Verify iss/aud/exp/nonce; reject tampered/expired/wrong-aud tokens | 🟢 |
+| T3 | Nonce: issue in auth URL, bind in state, enforce on callback | 🟢 |
+| T4 | Mock IdP fixture (RSA keypair, discovery, jwks, token endpoint) | 🟢 |
+| T5 | Full-flow tests: discovery→authorize→callback→session via mock IdP | 🟢 |
+| T6 | Negative tests: bad sig / wrong aud / expired / bad nonce → 401 | 🟢 |
+| T7 | Config flag to allow unverified decode (demo only) vs strict (default) | 🟢 |
+| T8 | Full suite + frontend build green; docs + package | 🟢 |
+
+### Round 4 changelog
+- **T1–T2:** strict JWKS signature verification (RS256/ES256) + iss/aud/exp
+  validation via PyJWT `PyJWKClient`.
+- **T3:** nonce issued in auth URL, bound into signed state, enforced on callback.
+- **T4:** mock IdP fixture (RSA keypair, discovery, JWKS, token endpoint).
+- **T5–T6:** full signed flow test + negatives (bad sig / wrong aud / expired /
+  nonce mismatch → rejected).
+- **T7:** `OIDC_VERIFY_SIGNATURE` flag — strict by default, demo override.
+- **T8:** backend 251 pass; docs + .env.example updated; packaged.
+
+### Round 4 — COMPLETE

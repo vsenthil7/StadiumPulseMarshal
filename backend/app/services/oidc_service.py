@@ -15,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
@@ -39,6 +40,7 @@ class OIDCProvider:
     token_endpoint: str
     jwks_uri: str | None = None
     userinfo_endpoint: str | None = None
+    issuer: str | None = None
 
 
 @dataclass
@@ -85,6 +87,7 @@ class OIDCService:
             token_endpoint=doc["token_endpoint"],
             jwks_uri=doc.get("jwks_uri"),
             userinfo_endpoint=doc.get("userinfo_endpoint"),
+            issuer=doc.get("issuer", self._s.oidc_issuer),
         )
         return self._provider
 
@@ -92,8 +95,8 @@ class OIDCService:
     def _secret(self) -> str:
         return self._s.jwt_secret or "stadiumpulse-oidc-state-secret"
 
-    def make_state(self, return_to: str = "/") -> str:
-        payload = {"t": int(time.time()), "r": return_to}
+    def make_state(self, return_to: str = "/", nonce: str = "") -> str:
+        payload = {"t": int(time.time()), "r": return_to, "n": nonce}
         raw = json.dumps(payload, separators=(",", ":")).encode()
         body = base64.urlsafe_b64encode(raw).decode().rstrip("=")
         sig = hmac.new(self._secret().encode(), body.encode(), hashlib.sha256).hexdigest()[:16]
@@ -116,18 +119,21 @@ class OIDCService:
     # --- authorization URL ---------------------------------------------------
     async def authorization_url(self, return_to: str = "/") -> str:
         provider = await self.discover()
+        nonce = secrets.token_urlsafe(16)
         params = {
             "response_type": "code",
             "client_id": self._s.oidc_client_id,
             "redirect_uri": self._s.oidc_redirect_uri,
             "scope": " ".join(self._s.oidc_scope_list),
-            "state": self.make_state(return_to),
+            "state": self.make_state(return_to, nonce),
+            "nonce": nonce,
         }
         return f"{provider.authorization_endpoint}?{urlencode(params)}"
 
     # --- code exchange -------------------------------------------------------
     async def exchange_code(
-        self, code: str, client: httpx.AsyncClient | None = None
+        self, code: str, expected_nonce: str = "",
+        client: httpx.AsyncClient | None = None,
     ) -> OIDCIdentity:
         provider = await self.discover(client)
         owns = client is None
@@ -152,7 +158,58 @@ class OIDCService:
         id_token = tokens.get("id_token")
         if not id_token:
             raise OIDCError("No id_token in token response")
-        return self.identity_from_id_token(id_token)
+        claims = self._decode_and_verify(id_token, provider, expected_nonce)
+        return self.identity_from_claims(claims)
+
+    # --- token verification --------------------------------------------------
+    def _decode_and_verify(
+        self, id_token: str, provider: OIDCProvider, expected_nonce: str
+    ) -> dict:
+        """Verify the ID token's signature and standard claims.
+
+        Strict by default: fetch the provider JWKS and verify the RS256/ES256
+        signature plus issuer, audience and expiry; bind the nonce to the one we
+        issued. Only when ``oidc_verify_signature`` is explicitly disabled (a
+        local unsigned demo IdP) do we fall back to an unverified claims decode.
+        """
+        if not self._s.oidc_verify_signature:
+            claims = _decode_unverified(id_token)
+            self._check_claims(claims, provider, expected_nonce, verify_aud=False)
+            return claims
+        if _jwt is None:  # pragma: no cover
+            raise OIDCError("PyJWT unavailable for verification")
+        if not provider.jwks_uri:
+            raise OIDCError("Provider has no jwks_uri; cannot verify")
+        try:
+            from jwt import PyJWKClient
+
+            signing_key = PyJWKClient(provider.jwks_uri).get_signing_key_from_jwt(id_token)
+            claims = _jwt.decode(
+                id_token,
+                signing_key.key,
+                algorithms=["RS256", "ES256"],
+                audience=self._s.oidc_client_id,
+                issuer=provider.issuer,
+                options={"require": ["exp", "iat"]},
+            )
+        except OIDCError:
+            raise
+        except Exception as exc:  # jwt.* errors → unauthorized
+            raise UnauthorizedError(f"ID token verification failed: {exc}") from exc
+        self._check_claims(claims, provider, expected_nonce, verify_aud=True)
+        return claims
+
+    def _check_claims(
+        self, claims: dict, provider: OIDCProvider, expected_nonce: str,
+        verify_aud: bool,
+    ) -> None:
+        if expected_nonce and claims.get("nonce") != expected_nonce:
+            raise UnauthorizedError("OIDC nonce mismatch")
+        if verify_aud:
+            aud = claims.get("aud")
+            auds = aud if isinstance(aud, list) else [aud]
+            if self._s.oidc_client_id not in auds:
+                raise UnauthorizedError("OIDC audience mismatch")
 
     # --- claims → identity ---------------------------------------------------
     def identity_from_id_token(self, id_token: str) -> OIDCIdentity:

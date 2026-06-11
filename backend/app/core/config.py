@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     oidc_roles_claim: str = Field(default="roles")
     oidc_venues_claim: str = Field(default="venues")
     oidc_scopes: str = Field(default="openid profile email")
+    # Strict mode (default) verifies the ID-token signature against the
+    # provider JWKS and validates iss/aud/exp/nonce. Disable ONLY for a local
+    # demo IdP that doesn't sign tokens.
+    oidc_verify_signature: bool = Field(default=True)
 
     @property
     def oidc_enabled(self) -> bool:

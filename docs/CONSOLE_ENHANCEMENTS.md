@@ -182,3 +182,33 @@ returned token from the callback fragment, then rehydrates via `/auth/me`.
 - Backend **245 pass** (+13 this round: venue per-entity enforcement + OIDC).
 - Frontend `tsc -b` + `vite build` green; 7 runnable RBAC unit tests pass.
 - Live-verified: OIDC `status`, per-entity cross-venue **403** on read + write.
+
+---
+
+## Round 4 — Production-grade OIDC (signature verification)
+
+Round 3 shipped the OIDC flow but decoded the ID token without verifying the
+provider signature — fine for a demo, not for production. Round 4 closes that.
+
+### Strict verification (default)
+`OIDCService` now, by default (`OIDC_VERIFY_SIGNATURE=true`):
+- fetches the provider **JWKS** and verifies the ID-token **RS256/ES256
+  signature** (via PyJWT's `PyJWKClient`),
+- validates **issuer**, **audience** (must equal the client id), and **expiry**
+  (`exp`/`iat` required),
+- issues a **nonce** in the authorization request, binds it into the signed
+  `state`, and enforces it on the callback (replay/CSRF defence).
+
+A demo escape hatch (`OIDC_VERIFY_SIGNATURE=false`) allows an unsigned local IdP
+— the nonce is still checked, but the signature isn't. Default is strict.
+
+### Mock IdP + full-flow tests
+A self-contained mock IdP (RSA keypair, discovery doc, JWKS, token endpoint via
+`httpx.MockTransport`) exercises the real signed flow end to end:
+- valid signed token → identity with mapped role + venues ✅
+- **bad signature → rejected**, **wrong audience → rejected**,
+  **expired → rejected**, **nonce mismatch → rejected**,
+- demo unverified mode still accepts an unsigned token (nonce enforced).
+
+### Tests
+Backend **251 pass** (+6 full-flow/negative OIDC). Frontend build unchanged/green.

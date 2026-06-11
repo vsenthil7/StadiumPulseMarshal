@@ -181,7 +181,7 @@ async def oidc_callback(request: Request, code: str | None = None, state: str | 
         raise UnauthorizedError("Missing code/state")
     data = svc.verify_state(state)
     try:
-        identity = await svc.exchange_code(code)
+        identity = await svc.exchange_code(code, expected_nonce=data.get("n", ""))
     except OIDCError as exc:
         raise UnauthorizedError(str(exc)) from exc
     token = svc.mint_session_jwt(identity)
