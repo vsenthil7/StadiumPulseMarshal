@@ -47,11 +47,17 @@ async def get_principal(
     x_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
 ) -> Principal:
-    """Resolve the current principal (or raise 401)."""
-    settings = request.app.state.ctx.settings
-    if not settings.auth_enabled:
-        return ANONYMOUS_ADMIN
+    """Resolve the current principal (or raise 401).
 
+    When auth is disabled the request normally acts as a full-access admin so
+    the demo runs unguarded. However, if the caller *does* present a bearer
+    token we honor it — this lets the demo console sign in as a specific role
+    and see real RBAC gating without flipping a global flag. A demo fallback
+    secret is accepted so the bundled login works out-of-the-box.
+    """
+    settings = request.app.state.ctx.settings
+
+    # API key (only meaningful when configured).
     if settings.api_key and x_api_key == settings.api_key:
         return Principal(
             subject="api-key",
@@ -59,16 +65,27 @@ async def get_principal(
             auth_method="api_key",
         )
 
+    # Bearer token: try the configured secret, then the demo fallback secret.
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1]
-        if settings.jwt_secret:
-            claims = _decode_jwt(token, settings.jwt_secret)
+        from app.api.routes_auth import _DEMO_SECRET
+
+        for secret in filter(None, (settings.jwt_secret, _DEMO_SECRET)):
+            try:
+                claims = _decode_jwt(token, secret)
+            except UnauthorizedError:
+                continue
             roles = _claim_roles(claims, settings.jwt_roles_claim)
             return Principal(
                 subject=str(claims.get("sub", "jwt-user")),
                 roles=roles_from_names(roles),
                 auth_method="jwt",
             )
+        # A token was presented but did not verify under any known secret.
+        raise UnauthorizedError("Invalid token")
+
+    if not settings.auth_enabled:
+        return ANONYMOUS_ADMIN
 
     raise UnauthorizedError("Authentication required")
 

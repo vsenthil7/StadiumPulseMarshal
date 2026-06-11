@@ -1,8 +1,9 @@
 """API routes for StadiumPulse Marshal."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.auth import require_permission
 from app.api.schemas import (
     AnalyzeResponse,
     AuditResponse,
@@ -19,6 +20,7 @@ from app.api.schemas import (
 )
 from app.core.context import AppContext
 from app.models.domain import Problem
+from app.rbac.policy import Permission
 
 router = APIRouter(prefix="/api/v1")
 
@@ -117,7 +119,8 @@ async def list_remediations(request: Request, pending: bool = False) -> Remediat
     tags=["remediation"],
 )
 async def approve(
-    request: Request, action_id: str, body: DecisionRequest
+    request: Request, action_id: str, body: DecisionRequest,
+    _p=Depends(require_permission(Permission.REMEDIATION_APPROVE)),
 ) -> DecisionResponse:
     ctx = _ctx(request)
     decision = ctx.store.decide(
@@ -136,7 +139,8 @@ async def approve(
     tags=["remediation"],
 )
 async def reject(
-    request: Request, action_id: str, body: DecisionRequest
+    request: Request, action_id: str, body: DecisionRequest,
+    _p=Depends(require_permission(Permission.REMEDIATION_APPROVE)),
 ) -> DecisionResponse:
     ctx = _ctx(request)
     decision = ctx.store.decide(
@@ -160,7 +164,10 @@ async def audit(request: Request) -> AuditResponse:
     response_model=ExecuteResponse,
     tags=["remediation"],
 )
-async def execute(request: Request, action_id: str) -> ExecuteResponse:
+async def execute(
+    request: Request, action_id: str,
+    _p=Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> ExecuteResponse:
     """Mark an approved remediation as executed (human-in-the-loop apply step).
 
     In live mode this is where an approved runbook would be dispatched to the
@@ -184,7 +191,10 @@ async def execute(request: Request, action_id: str) -> ExecuteResponse:
 
 
 @router.patch("/settings", response_model=ConfigResponse, tags=["system"])
-async def update_settings(request: Request, body: SettingsUpdate) -> ConfigResponse:
+async def update_settings(
+    request: Request, body: SettingsUpdate,
+    _p=Depends(require_permission(Permission.SETTINGS_WRITE)),
+) -> ConfigResponse:
     """Update human-in-the-loop guardrails at runtime."""
     ctx = _ctx(request)
     if body.auto_approve_low_risk is not None:

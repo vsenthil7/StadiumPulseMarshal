@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './_auth';
 
 test.describe('StadiumPulse Marshal — matchday console', () => {
+  test.beforeEach(async ({ page }) => { await loginAs(page, 'admin'); });
   test('loads console and shows live problem feed', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.brand')).toContainText('StadiumPulse Marshal');
-    await expect(page.getByTestId('mode-badge')).toContainText('MOCK');
+    await expect(page.getByTestId('health-pill')).toContainText('SEED');
     // Open count badge shows 2 open problems from the fixture scenario.
     await expect(page.getByTestId('open-count')).toHaveText('2');
     const cards = page.getByTestId('problem-card');
@@ -65,11 +67,11 @@ test.describe('StadiumPulse Marshal — matchday console', () => {
     await expect(toggle).toBeChecked();
   });
 
-  test('change operator identity', async ({ page }) => {
+  test('operator identity comes from the signed-in session', async ({ page }) => {
     await page.goto('/');
-    const op = page.getByTestId('operator-input');
-    await op.fill('sre-marshal-lead');
-    await expect(op).toHaveValue('sre-marshal-lead');
+    // Identity is now the authenticated user (set at login), shown in the
+    // user menu role badge rather than a free-text field.
+    await expect(page.getByTestId('role-badge')).toBeVisible();
   });
 
   test('select a different problem from the feed', async ({ page }) => {

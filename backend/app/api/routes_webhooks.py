@@ -1,7 +1,7 @@
 """Webhook subscription management routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_permission
@@ -55,15 +55,16 @@ async def create_webhook(
     return WebhookResponse(webhook=sub)
 
 
-@router.delete("/{webhook_id}", status_code=204)
+@router.delete("/{webhook_id}", status_code=204, response_class=Response)
 async def delete_webhook(
     request: Request,
     webhook_id: str,
     _p=Depends(require_permission(Permission.WEBHOOK_ADMIN)),
-) -> None:
+) -> Response:
     ctx = _ctx(request)
     if not ctx.webhooks.delete(webhook_id):
         raise NotFoundError("Webhook not found")
+    return Response(status_code=204)
 
 
 @router.get("/dead-letter/list", response_model=WebhookListResponse)

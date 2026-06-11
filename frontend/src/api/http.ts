@@ -9,6 +9,13 @@
  */
 const BASE = '/api/v1';
 
+// Bearer token shared with client.ts (set by the auth context). Sent on every
+// request so the backend resolves the JWT principal.
+let _authToken: string | null = null;
+export function setHttpAuthToken(token: string | null): void {
+  _authToken = token;
+}
+
 export interface ApiErrorShape {
   code: string;
   message: string;
@@ -75,7 +82,10 @@ export async function request<T>(
   for (;;) {
     try {
       const res = await fetch(`${BASE}${path}`, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(_authToken ? { Authorization: `Bearer ${_authToken}` } : {}),
+        },
         signal,
         ...init,
       });

@@ -10,9 +10,22 @@ import type {
 
 const BASE = '/api/v1';
 
+// Bearer token set by the auth context (lib/auth.tsx). When present it is sent
+// on every request so the backend can resolve a Principal from the JWT.
+let _authToken: string | null = null;
+export function setAuthToken(token: string | null): void {
+  _authToken = token;
+}
+export function getAuthToken(): string | null {
+  return _authToken;
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(_authToken ? { Authorization: `Bearer ${_authToken}` } : {}),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -258,3 +271,13 @@ export const apiP4 = {
 export function newIdempotencyKey(): string {
   return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+// ── Health surface (system endpoints) ──────────────────────────────────────
+export interface HealthInfo { status: string; version?: string }
+export interface ReadyInfo { status: string; checks: Record<string, string> }
+
+export const systemApi = {
+  health: () => http<HealthInfo>('/health'),
+  ready: () => http<ReadyInfo>('/ready'),
+  config: () => http<import('../types').AppConfig>('/config'),
+};
