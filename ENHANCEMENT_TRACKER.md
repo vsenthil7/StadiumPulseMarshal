@@ -878,3 +878,23 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **AS2:** docs + package.
 
 ### Round 16 — COMPLETE
+
+### Round 17 changelog
+- **Track AT — shared (KV-backed) ack store:** SharedBurnAckStore keeps ack/silence
+  state in a single JSON doc in the KV (Memory/Redis), async, with ack TTL +
+  silence expiry pruned on read. Context now uses it (kv built before the store);
+  burn eval awaits async lookups. +6 tests incl. two stores sharing one KV seeing
+  each other's ack/silence. Live-verified.
+- **Track AU — un-ack / un-silence + expiry:** DELETE /slo/burn-alerts/{slo}/ack
+  and /silence (responder+, audited); ack auto-expiry via BURN_ACK_TTL_SECONDS;
+  banner gains a Clear control. +tests. Live-verified ack→un-ack round-trip.
+- **Track AV — on-call ack/silence view:** /oncall returns ack_state (active acks +
+  silences); On-call page shows them. +test.
+- **Track AW — burn audit history:** GET /slo/burn-events returns burn.ack/.silence/
+  .unack/.unsilence audit trail (responder+, action filter); On-call page renders a
+  burn-history table. +tests. Live-verified full ack/unack/silence trail.
+- **AX1:** backend **384 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **AX2:** docs + package.
+
+### Round 17 — COMPLETE

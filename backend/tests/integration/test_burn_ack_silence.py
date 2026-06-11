@@ -74,3 +74,61 @@ def test_silence_suppresses_and_marks():
                  if x["slo_id"] == a["slo_id"] and x["severity"] == a["severity"]]
         assert match and match[0]["silenced"] is True
         assert again["silenced_count"] >= 1
+
+
+def test_unack_clears_and_audited():
+    with TestClient(create_app()) as c:
+        tok = _login(c, "responder@arena-north.demo")
+        h = {"Authorization": f"Bearer {tok}"}
+        alerts = c.get("/api/v1/slo/burn-alerts", headers=h).json()["alerts"]
+        if not alerts:
+            pytest.skip("no burn alerts")
+        a = alerts[0]
+        c.post(f"/api/v1/slo/burn-alerts/{a['slo_id']}/ack",
+               json={"severity": a["severity"]}, headers=h)
+        # un-ack
+        r = c.request("DELETE", f"/api/v1/slo/burn-alerts/{a['slo_id']}/ack",
+                      params={"severity": a["severity"]}, headers=h)
+        assert r.status_code == 200 and r.json()["cleared"] is True
+        again = c.get("/api/v1/slo/burn-alerts", headers=h).json()
+        match = [x for x in again["alerts"]
+                 if x["slo_id"] == a["slo_id"] and x["severity"] == a["severity"]]
+        assert match and match[0]["acknowledged"] is False
+
+
+def test_burn_events_history():
+    with TestClient(create_app()) as c:
+        tok = _login(c, "responder@arena-north.demo")
+        h = {"Authorization": f"Bearer {tok}"}
+        alerts = c.get("/api/v1/slo/burn-alerts", headers=h).json()["alerts"]
+        if not alerts:
+            pytest.skip("no burn alerts")
+        a = alerts[0]
+        c.post(f"/api/v1/slo/burn-alerts/{a['slo_id']}/ack",
+               json={"severity": a["severity"], "note": "hist"}, headers=h)
+        ev = c.get("/api/v1/slo/burn-events", headers=h).json()
+        assert ev["total"] >= 1
+        assert any(e["action"] == "burn.ack" for e in ev["events"])
+        # filter
+        only = c.get("/api/v1/slo/burn-events?action=burn.ack", headers=h).json()
+        assert all(e["action"] == "burn.ack" for e in only["events"])
+
+
+def test_burn_events_requires_responder():
+    with TestClient(create_app()) as c:
+        v = _login(c, "viewer@arena-north.demo")
+        r = c.get("/api/v1/slo/burn-events", headers={"Authorization": f"Bearer {v}"})
+        assert r.status_code == 403
+
+
+def test_oncall_ack_state_present():
+    with TestClient(create_app()) as c:
+        tok = _login(c, "responder@arena-north.demo")
+        h = {"Authorization": f"Bearer {tok}"}
+        alerts = c.get("/api/v1/slo/burn-alerts", headers=h).json()["alerts"]
+        if alerts:
+            a = alerts[0]
+            c.post(f"/api/v1/slo/burn-alerts/{a['slo_id']}/silence",
+                   json={"severity": a["severity"], "minutes": 15}, headers=h)
+        oc = c.get("/api/v1/oncall", headers=h).json()
+        assert "ack_state" in oc and "acks" in oc["ack_state"] and "silences" in oc["ack_state"]

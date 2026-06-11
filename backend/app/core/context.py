@@ -41,9 +41,14 @@ class AppContext:
 
         self.oncall_directory = OnCallDirectory(default_on_call())
         self.notifications.set_oncall_directory(self.oncall_directory)
-        from app.services.burn_ack_store import BurnAckStore
+        from app.services.kv_backend import build_kv
 
-        self.burn_acks = BurnAckStore()
+        self.kv = build_kv(self.settings.redis_url)
+        from app.services.shared_burn_ack_store import SharedBurnAckStore
+
+        self.burn_acks = SharedBurnAckStore(
+            self.kv, ack_ttl_seconds=self.settings.burn_ack_ttl_seconds,
+        )
         from app.services.schedule_source import build_schedule_source
 
         self.schedule_source = build_schedule_source(
@@ -105,9 +110,7 @@ class AppContext:
             interval_seconds=self.settings.refresh_prune_interval_seconds,
         )
         from app.services.rate_limiter import RateLimiter
-        from app.services.kv_backend import build_kv
 
-        self.kv = build_kv(self.settings.redis_url)
         self.auth_limiter = RateLimiter(
             self.settings.auth_rate_limit_per_minute, kv=self.kv
         )
@@ -286,11 +289,11 @@ class AppContext:
                 for t in self.oncall_directory.targets_for_severity(sev)
             ]
             # Acknowledge / silence state.
-            ack = self.burn_acks.ack_for(a.slo_id, sev)
+            ack = await self.burn_acks.ack_for(a.slo_id, sev)
             if ack is not None:
                 a.acknowledged = True
                 a.acked_by = ack.acked_by
-            a.silenced = self.burn_acks.is_silenced(a.slo_id, sev)
+            a.silenced = await self.burn_acks.is_silenced(a.slo_id, sev)
         # Auto-route page/ticket burn alerts to notification channels (the
         # service dedupes per slo+severity within the alert window). Silenced
         # alerts are not dispatched.

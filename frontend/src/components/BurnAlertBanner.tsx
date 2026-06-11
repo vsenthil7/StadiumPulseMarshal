@@ -64,6 +64,17 @@ export function BurnAlertBanner() {
     }
   };
 
+  const clearState = async (a: BurnAlert) => {
+    setBusy(a.slo_id + a.severity);
+    try {
+      if (a.acknowledged) await apiExt.unackBurnAlert(a.slo_id, a.severity);
+      if (a.silenced) await apiExt.unsilenceBurnAlert(a.slo_id, a.severity);
+      load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (alerts.length === 0) return null;
 
   return (
@@ -106,6 +117,13 @@ export function BurnAlertBanner() {
                   </button>
                   <button className="seg" disabled={busy === key} onClick={() => silence(a)}>
                     Silence 1h
+                  </button>
+                </span>
+              )}
+              {canAct && (a.acknowledged || a.silenced) && (
+                <span className="burn-actions">
+                  <button className="seg" disabled={busy === key} onClick={() => clearState(a)}>
+                    Clear
                   </button>
                 </span>
               )}

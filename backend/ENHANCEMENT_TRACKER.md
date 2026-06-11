@@ -39,3 +39,44 @@
 |---|--------|--------|
 | AS1 | Full backend suite + frontend tsc/build + node unit green | ⚪ |
 | AS2 | Docs + package | ⚪ |
+
+---
+
+## Round 17 — Shared ack store, un-ack/expiry, on-call ack view, burn audit history
+
+### Track AT — KV-backed (shared) ack/silence store
+| # | Sprint | Status |
+|---|--------|--------|
+| AT1 | SharedBurnAckStore: single-doc JSON in KV (Memory/Redis), async | ⚪ |
+| AT2 | ack/silence/is_silenced/ack_for parity with in-proc store | ⚪ |
+| AT3 | ack TTL/expiry; silence expiry; prune on read | ⚪ |
+| AT4 | Context uses shared store (KV); burn eval awaits async lookups | ⚪ |
+| AT5 | Tests: two stores sharing one KV see each other's ack/silence | ⚪ |
+
+### Track AU — un-ack / un-silence + ack expiry
+| # | Sprint | Status |
+|---|--------|--------|
+| AU1 | DELETE ack + DELETE silence endpoints (responder+, audited) | ⚪ |
+| AU2 | ack auto-expiry window (config); expired acks drop on read | ⚪ |
+| AU3 | Frontend: un-ack/un-silence controls on banner | ⚪ |
+| AU4 | Tests: un-ack clears, expiry drops, RBAC | ⚪ |
+
+### Track AV — on-call page ack/silence state + counts
+| # | Sprint | Status |
+|---|--------|--------|
+| AV1 | /oncall includes active acks/silences summary | ⚪ |
+| AV2 | On-call page shows current acks/silences | ⚪ |
+| AV3 | Tests + tsc/build | ⚪ |
+
+### Track AW — burn-alert audit/history view
+| # | Sprint | Status |
+|---|--------|--------|
+| AW1 | GET /slo/burn-events: burn.ack/.silence audit history (filter/paginate) | ⚪ |
+| AW2 | Frontend: burn history on On-call (or Security) page | ⚪ |
+| AW3 | Tests: history returns ack/silence events; scoped to admin/responder | ⚪ |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| AX1 | Full backend suite + frontend tsc/build + node unit green | ⚪ |
+| AX2 | Docs + package | ⚪ |

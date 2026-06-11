@@ -596,3 +596,27 @@ Venue-scoped; 404 for an unknown SLO.
 
 ### Tests
 Backend **374 pass** (+8 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 17 — Shared ack store, un-ack/expiry, on-call ack view, burn history
+
+### Multi-instance acknowledge / silence
+Burn ack/silence state moved to a KV-backed `SharedBurnAckStore` (a single JSON
+document in Memory or Redis), so acknowledging or silencing on one replica is
+seen by all. Acks auto-expire (`BURN_ACK_TTL_SECONDS`) and silences expire at
+their deadline, pruned on read.
+
+### Un-ack / un-silence
+Responders can clear an acknowledgement or lift a silence early via
+`DELETE /slo/burn-alerts/{slo}/ack` and `/silence` (audited); the Reliability
+banner shows a Clear control on acked/silenced alerts.
+
+### On-call ack/silence view + burn history
+`/oncall` now includes the active acks and silences, and `GET /slo/burn-events`
+returns the ack/silence audit trail (responder+, filterable by action). The
+On-call page surfaces both — current acknowledgements/silences and a burn-alert
+history table.
+
+### Tests
+Backend **384 pass** (+10 this round). Frontend `tsc -b` + `vite build` green.

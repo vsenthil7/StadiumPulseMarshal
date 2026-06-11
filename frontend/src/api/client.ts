@@ -135,6 +135,19 @@ export const apiExt = {
     http<{ silenced: boolean }>(`/slo/burn-alerts/${sloId}/silence`, {
       method: 'POST', body: JSON.stringify({ severity, minutes }),
     }),
+  unackBurnAlert: (sloId: string, severity: string) =>
+    http<{ cleared: boolean }>(`/slo/burn-alerts/${sloId}/ack?severity=${encodeURIComponent(severity)}`, {
+      method: 'DELETE',
+    }),
+  unsilenceBurnAlert: (sloId: string, severity: string) =>
+    http<{ cleared: boolean }>(`/slo/burn-alerts/${sloId}/silence?severity=${encodeURIComponent(severity)}`, {
+      method: 'DELETE',
+    }),
+  getBurnEvents: (action?: string) =>
+    http<{
+      events: { id: string; at: string; actor: string; action: string; target: string; detail: Record<string, unknown> }[];
+      total: number;
+    }>(`/slo/burn-events${action ? `?action=${encodeURIComponent(action)}` : ''}`),
   getOnCall: () =>
     http<{
       roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
@@ -146,6 +159,10 @@ export const apiExt = {
       schedule?: {
         type: string; next_handoff_epoch?: number; now_epoch?: number;
         rotation?: { tier: string; current: { name: string }; next: { name: string }; pool_size: number }[];
+      };
+      ack_state?: {
+        acks: { slo_id: string; severity: string; acked_by: string }[];
+        silences: { slo_id: string; severity: string; until: number; by: string }[];
       };
     }>('/oncall'),
   getNotifications: () =>

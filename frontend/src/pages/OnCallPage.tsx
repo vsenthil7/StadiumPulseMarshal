@@ -15,6 +15,10 @@ interface OnCallData {
     type: string; next_handoff_epoch?: number; now_epoch?: number;
     rotation?: { tier: string; current: { name: string }; next: { name: string }; pool_size: number }[];
   };
+  ack_state?: {
+    acks: { slo_id: string; severity: string; acked_by: string }[];
+    silences: { slo_id: string; severity: string; until: number; by: string }[];
+  };
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -25,6 +29,7 @@ const TIER_LABEL: Record<string, string> = {
 
 export function OnCallPage() {
   const [data, setData] = useState<OnCallData | null>(null);
+  const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,6 +39,10 @@ export function OnCallPage() {
       .then((d) => ok && setData(d))
       .catch(() => ok && setData(null))
       .finally(() => ok && setLoading(false));
+    apiExt
+      .getBurnEvents()
+      .then((r) => ok && setHistory(r.events))
+      .catch(() => ok && setHistory([]));
     return () => {
       ok = false;
     };
@@ -122,6 +131,53 @@ export function OnCallPage() {
           ))}
         </div>
       </div>
+
+      {data.ack_state && (data.ack_state.acks.length > 0 || data.ack_state.silences.length > 0) && (
+        <div className="panel">
+          <header><h3>Active acknowledgements & silences</h3></header>
+          <div className="body">
+            {data.ack_state.acks.map((a) => (
+              <div key={`a-${a.slo_id}-${a.severity}`} className="rotation-row">
+                <span className="burn-state-chip">ack</span>
+                <span>{a.slo_id} ({a.severity})</span>
+                <span className="rotation-next">by {a.acked_by}</span>
+              </div>
+            ))}
+            {data.ack_state.silences.map((s) => (
+              <div key={`s-${s.slo_id}-${s.severity}`} className="rotation-row">
+                <span className="burn-state-chip">silenced</span>
+                <span>{s.slo_id} ({s.severity})</span>
+                <span className="rotation-next">
+                  by {s.by} · until {new Date(s.until * 1000).toLocaleTimeString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div className="panel">
+          <header><h3>Burn-alert history</h3></header>
+          <div className="body">
+            <table className="data-table">
+              <thead>
+                <tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr>
+              </thead>
+              <tbody>
+                {history.slice(0, 20).map((e) => (
+                  <tr key={e.id}>
+                    <td className="mono">{new Date(e.at).toLocaleString()}</td>
+                    <td>{e.actor}</td>
+                    <td>{e.action.replace('burn.', '')}</td>
+                    <td className="mono">{e.target}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <header><h3>Escalation policies</h3></header>

@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     # fixed shift cadence so the on-call roster advances over time.
     oncall_rotation_enabled: bool = Field(default=True)
     oncall_shift_hours: float = Field(default=12.0)
+    burn_ack_ttl_seconds: float = Field(default=4 * 3600)
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

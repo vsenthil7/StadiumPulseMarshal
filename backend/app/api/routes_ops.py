@@ -203,9 +203,10 @@ async def get_oncall(
         schedule["now_epoch"] = _time.time()
     if hasattr(src, "pool_view"):
         schedule["rotation"] = src.pool_view()
+    ack_state = await ctx.burn_acks.active_summary()
     return {
         "roster": roster, "policies": policies, "burn_targets": burn_targets,
-        "schedule": schedule,
+        "schedule": schedule, "ack_state": ack_state,
     }
 
 

@@ -41,6 +41,30 @@ class BulkTransitionResponse(BaseModel):
     failed: dict[str, str] = Field(default_factory=dict)
 
 
+@router.get("/slo/burn-events", tags=["slo"])
+async def slo_burn_events(
+    request: Request, limit: int = 100, action: str | None = None,
+    _p: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Burn-alert ack/silence audit history (responder+).
+
+    Returns burn.ack / burn.silence / burn.unack / burn.unsilence audit entries,
+    newest first. Optional ``action`` filter (e.g. ``burn.ack``).
+    """
+    ctx = _ctx(request)
+    entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
+    rows = [
+        {
+            "id": e.id, "at": e.at.isoformat(), "actor": e.actor,
+            "action": e.action, "target": e.resource_id, "detail": e.metadata,
+        }
+        for e in entries
+        if action is None or e.action == action
+    ]
+    rows.sort(key=lambda r: r["at"], reverse=True)
+    return {"events": rows[:limit], "total": len(rows)}
+
+
 @router.get("/slo/burn-alerts", response_model=BurnAlertList, tags=["slo"])
 async def slo_burn_alerts(
     request: Request,
@@ -78,7 +102,7 @@ async def ack_burn_alert(
 ) -> dict:
     """Acknowledge a burn alert (responder+). Recorded with who/when + audited."""
     ctx = _ctx(request)
-    rec = ctx.burn_acks.acknowledge(slo_id, body.severity, principal.subject, body.note)
+    rec = await ctx.burn_acks.acknowledge(slo_id, body.severity, principal.subject, body.note)
     try:
         await ctx.audit.record(
             actor=principal.subject, action="burn.ack",
@@ -97,7 +121,7 @@ async def silence_burn_alert(
 ) -> dict:
     """Silence a burn alert for N minutes (responder+); suppresses dispatch."""
     ctx = _ctx(request)
-    rec = ctx.burn_acks.silence(slo_id, body.severity, body.minutes, principal.subject)
+    rec = await ctx.burn_acks.silence(slo_id, body.severity, body.minutes, principal.subject)
     try:
         await ctx.audit.record(
             actor=principal.subject, action="burn.silence",
@@ -107,6 +131,44 @@ async def silence_burn_alert(
     except Exception:  # noqa: BLE001
         pass
     return {"silenced": True, "until": rec.until, "by": rec.by}
+
+
+@router.delete("/slo/burn-alerts/{slo_id}/ack", tags=["slo"])
+async def unack_burn_alert(
+    slo_id: str, severity: str, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Clear an acknowledgement (responder+); audited."""
+    ctx = _ctx(request)
+    cleared = await ctx.burn_acks.clear_ack(slo_id, severity)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="burn.unack",
+            resource_type="burn_alert", resource_id=f"{slo_id}:{severity}",
+            metadata={},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"cleared": cleared}
+
+
+@router.delete("/slo/burn-alerts/{slo_id}/silence", tags=["slo"])
+async def unsilence_burn_alert(
+    slo_id: str, severity: str, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Lift a silence early (responder+); audited."""
+    ctx = _ctx(request)
+    cleared = await ctx.burn_acks.clear_silence(slo_id, severity)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="burn.unsilence",
+            resource_type="burn_alert", resource_id=f"{slo_id}:{severity}",
+            metadata={},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"cleared": cleared}
 
 
 @router.get("/slo/trends", response_model=SLOTrendResponse, tags=["slo"])
