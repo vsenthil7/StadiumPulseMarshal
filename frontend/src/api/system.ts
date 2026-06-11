@@ -14,4 +14,11 @@ export const systemApi = {
       '/venues',
     ),
   oidcStatus: () => http<{ enabled: boolean }>('/auth/oidc/status'),
+  authEvents: () =>
+    http<{
+      events: {
+        id: string; at: string; actor: string; action: string;
+        outcome: string; ip: string; detail: Record<string, unknown>;
+      }[];
+    }>('/auth/events'),
 };

@@ -93,3 +93,34 @@ def test_reuse_detection_is_audited():
         rows = asyncio.get_event_loop().run_until_complete(_q())
         actions = [e.action for e in rows]
         assert "auth.refresh_reuse_detected" in actions
+
+
+# ── Track M: /auth/events endpoint (admin-only) ─────────────────────────────
+def test_auth_events_endpoint_admin_only():
+    app = create_app()
+    with TestClient(app) as c:
+        app.state.ctx.auth_limiter.per_minute = 100
+        app.state.ctx.auth_limiter.reset()
+        # generate some events
+        c.post("/api/v1/auth/login",
+               json={"email": "admin@arena-north.demo", "password": PW})
+        c.post("/api/v1/auth/login",
+               json={"email": "x@y.demo", "password": "bad"})
+        admin = c.post("/api/v1/auth/login",
+                       json={"email": "admin@arena-north.demo", "password": PW}).json()["token"]
+        viewer = c.post("/api/v1/auth/login",
+                        json={"email": "viewer@arena-north.demo", "password": PW}).json()["token"]
+        # viewer (no settings:write) is forbidden
+        assert c.get("/api/v1/auth/events",
+                     headers={"Authorization": f"Bearer {viewer}"}).status_code == 403
+        # admin sees events
+        r = c.get("/api/v1/auth/events",
+                  headers={"Authorization": f"Bearer {admin}"})
+        assert r.status_code == 200
+        events = r.json()["events"]
+        actions = {(e["action"], e["outcome"]) for e in events}
+        assert ("auth.login", "success") in actions
+        assert ("auth.login", "failure") in actions
+        # newest-first ordering
+        ats = [e["at"] for e in events]
+        assert ats == sorted(ats, reverse=True)

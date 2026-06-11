@@ -376,3 +376,31 @@ the same audit API as incident mutations.
 
 ### Tests
 Backend **297 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 10 — Multi-instance readiness + auth audit in the console
+
+### Shared backends for horizontal scale
+A `KVBackend` abstraction makes cross-instance state possible:
+- `MemoryKV` — process-local (single instance / demo / tests);
+- `RedisKV` — shared across replicas, used when `REDIS_URL` is set (redis-py is
+  imported lazily, so the dependency is optional).
+
+`RateLimiter.check_shared` runs an atomic fixed-window limit over the KV, so the
+always-on auth rate limit becomes **global across instances** in a clustered
+deployment; with no KV it transparently falls back to the in-process token
+bucket. `build_kv` selects Redis when configured and degrades to memory if
+Redis is unavailable, so a misconfiguration never blocks boot. (Refresh tokens
+were already shareable via the SQL repository from Round 7.)
+
+### Authentication audit trail in the UI
+`GET /api/v1/auth/events` (admin-only, gated by `settings:write`) returns the
+auth audit trail newest-first. A new **Security** page under Governance surfaces
+it: KPIs for total events, failures and token-reuse alerts; a filter for
+all / failures / token-reuse; and a table that flags theft detections. Verified
+live: viewers are 403, admins see login successes and failures.
+
+### Tests
+Backend **304 pass** (+7 this round: KV + shared limiter, /auth/events).
+Frontend `tsc -b` + `vite build` green; 7 node RBAC unit tests pass.

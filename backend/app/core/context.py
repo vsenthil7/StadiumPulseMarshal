@@ -85,8 +85,12 @@ class AppContext:
             interval_seconds=self.settings.refresh_prune_interval_seconds,
         )
         from app.services.rate_limiter import RateLimiter
+        from app.services.kv_backend import build_kv
 
-        self.auth_limiter = RateLimiter(self.settings.auth_rate_limit_per_minute)
+        self.kv = build_kv(self.settings.redis_url)
+        self.auth_limiter = RateLimiter(
+            self.settings.auth_rate_limit_per_minute, kv=self.kv
+        )
         self.current_scenario = self._initial_scenario()
 
     async def ensure_entity_venue_map(self) -> None:
@@ -205,6 +209,10 @@ class AppContext:
     async def shutdown(self) -> None:
         await self.prune_scheduler.stop()
         await self.relay.stop()
+        try:
+            await self.kv.close()
+        except Exception:  # noqa: BLE001
+            pass
         await self.client.close()
         await self.repos.dispose()
         await self._webhook_http.aclose()

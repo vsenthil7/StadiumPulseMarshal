@@ -1,0 +1,1 @@
+redis>=5  # optional: enables shared cross-instance rate limiting (REDIS_URL)

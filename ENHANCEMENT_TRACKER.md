@@ -457,3 +457,52 @@ Both tracks, full scope.
 - **K2:** docs + package.
 
 ### Round 9 — COMPLETE
+
+---
+
+## Round 10 — Multi-instance readiness (shared backends) + auth audit UI
+
+### Track L — shared/distributed backends (multi-instance)
+| # | Sprint | Status |
+|---|--------|--------|
+| L1 | KVBackend protocol (memory + Redis) for cross-instance state | 🟢 |
+| L2 | RateLimiter pluggable backend (atomic token bucket via KV) | 🟢 |
+| L3 | Redis refresh-token repo (or document SQL already shared) | 🟢 |
+| L4 | Config selects backend; graceful fallback to memory if Redis absent | 🟢 |
+| L5 | Tests: KV memory + limiter over KV; fallback path | 🟢 |
+
+### Track M — auth audit trail in the console
+| # | Sprint | Status |
+|---|--------|--------|
+| M1 | Backend: /auth/events query endpoint (admin-only, from audit log) | 🟢 |
+| M2 | Frontend: Security page (auth events table, filters) admin-gated | 🟢 |
+| M3 | Nav entry under Governance; wire api + render | 🟢 |
+| M4 | Tests: endpoint admin-gated + returns auth events; tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| N1 | Full backend suite + frontend tsc/build green | 🟢 |
+| N2 | Docs + package | 🟢 |
+
+### Round 10 changelog
+- **Track L — multi-instance readiness (L1–L5):** new `KVBackend` protocol with
+  `MemoryKV` (process-local) and `RedisKV` (shared, lazy redis.asyncio import).
+  `RateLimiter` gained `check_shared` — an atomic fixed-window limit over the KV
+  so auth limits are global across replicas; falls back to the in-process bucket
+  when no KV. `build_kv(REDIS_URL)` selects Redis when configured, else memory,
+  degrading gracefully if redis-py is absent. KV closed on shutdown. +6 tests
+  (KV ops, shared limiter blocks at window limit, per-key isolation, no-KV
+  fallback).
+- **Track M — auth audit UI (M1–M4):** admin-only `GET /auth/events` returns the
+  auth trail (login/refresh/reuse/logout) newest-first from the audit log,
+  gated by `settings:write`. New console **Security** page under Governance
+  (admin-only nav) with KPIs (events / failures / token-reuse alerts), an
+  all/failures/reuse filter, and a table flagging theft detections. +1 endpoint
+  test (viewer 403, admin 200, success+failure present, newest-first).
+  Live-verified.
+- **N1:** backend **304 pass**; frontend `tsc -b` + `vite build` green; 7 node
+  RBAC unit tests pass.
+- **N2:** docs + package.
+
+### Round 10 — COMPLETE

@@ -42,7 +42,7 @@ export function HealthPage() {
         <Kpi label="Data source" value={source === 'live' ? 'LIVE' : 'SEED'} tone={source === 'live' ? 'ok' : 'warn'} />
         <Kpi label="Liveness" value={err && source === 'seed' ? 'SEED' : health ? health.status.toUpperCase() : '—'} tone={health ? 'ok' : 'warn'} />
         <Kpi label="Readiness" value={ready ? (allReady ? 'READY' : 'DEGRADED') : (source === 'seed' ? 'SEED' : '—')} tone={allReady ? 'ok' : 'warn'} />
-        <Kpi label="Page coverage" value={`${NAV_PAGE_COUNT}/7`} tone="ok" />
+        <Kpi label="Page coverage" value={`${NAV_PAGE_COUNT}/${NAV_PAGE_COUNT}`} tone="ok" />
       </div>
 
       <section className="card">

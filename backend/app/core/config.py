@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # IP, independent of the global limiter. Protects against credential
     # stuffing / token-guessing even when the global limiter is disabled.
     auth_rate_limit_per_minute: int = Field(default=10)
+    # Optional shared backend for cross-instance rate-limiting (and future
+    # shared counters). When set, auth limits are global across replicas.
+    redis_url: str | None = None
 
     # --- Webhooks ---
     webhook_timeout_seconds: float = Field(default=5.0)

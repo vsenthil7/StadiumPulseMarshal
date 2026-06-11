@@ -18,8 +18,9 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from app.api.auth import get_principal, optional_principal as _optional_principal_dep
+from app.api.auth import require_permission
 from app.core.errors import RateLimitedError, UnauthorizedError
-from app.rbac.policy import Principal
+from app.rbac.policy import Permission, Principal
 
 try:  # PyJWT is optional at runtime
     import jwt as _jwt
@@ -99,10 +100,11 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _rate_limit(request: Request, route: str) -> None:
-    """Enforce the always-on per-IP auth limiter for ``route``."""
+async def _rate_limit(request: Request, route: str) -> None:
+    """Enforce the per-IP auth limiter for ``route`` (shared across instances
+    when a KV backend is configured, else in-process)."""
     limiter = request.app.state.ctx.auth_limiter
-    allowed, retry = limiter.check(f"{route}:{_client_ip(request)}")
+    allowed, retry = await limiter.check_shared(f"{route}:{_client_ip(request)}")
     if not allowed:
         raise RateLimitedError(
             "Too many authentication attempts",
@@ -130,7 +132,7 @@ async def _audit_auth(
 
 @router.post("/login")
 async def login(body: LoginIn, request: Request) -> dict:
-    _rate_limit(request, "login")
+    await _rate_limit(request, "login")
     user = DEMO_USERS.get(body.email.lower())
     if user is None or body.password != DEMO_PASSWORD:
         await _audit_auth(
@@ -228,7 +230,7 @@ async def refresh(
     """
     from app.services.refresh_store import ReuseError
 
-    _rate_limit(request, "refresh")
+    await _rate_limit(request, "refresh")
     store = request.app.state.ctx.refresh_tokens
 
     if body.refresh_token:
@@ -282,6 +284,40 @@ async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
             outcome="success",
         )
     return {"ok": True}
+
+
+@router.get("/events")
+async def auth_events(
+    request: Request,
+    limit: int = 100,
+    _p: Principal = Depends(require_permission(Permission.SETTINGS_WRITE)),
+) -> dict:
+    """Admin-only: the authentication audit trail (login/refresh/reuse/logout).
+
+    Reads auth-typed entries from the audit log, newest first, for the console's
+    Security page.
+    """
+    entries = await request.app.state.ctx.audit.query(
+        resource_type="auth", limit=limit
+    )
+    entries = sorted(entries, key=lambda e: e.at, reverse=True)
+    return {
+        "events": [
+            {
+                "id": e.id,
+                "at": e.at.isoformat(),
+                "actor": e.actor,
+                "action": e.action,
+                "outcome": e.metadata.get("outcome", ""),
+                "ip": e.metadata.get("ip", ""),
+                "detail": {
+                    k: v for k, v in e.metadata.items()
+                    if k not in ("outcome", "ip")
+                },
+            }
+            for e in entries
+        ]
+    }
 
 
 @router.get("/demo-users")
