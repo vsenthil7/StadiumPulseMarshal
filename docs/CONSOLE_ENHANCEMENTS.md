@@ -314,3 +314,35 @@ without any code change. Mock entities now carry `mz:` tags to exercise it.
 ### Tests
 Backend **278 pass** (+9 this round: async store, SQL rotation+prune, 7 resolver
 cases incl. the live zone-only shape). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 8 — Token hashing at rest + prune scheduler + live Dynatrace zones
+
+### Refresh tokens hashed at rest
+`RefreshStore` now persists only the SHA-256 **hash** of each refresh token; the
+raw token is returned to the client once and never stored. A database leak
+therefore exposes no usable tokens. All lookups (rotate/revoke/subject) hash the
+presented token first. Verified: the raw token appears in neither the in-memory
+store nor the SQLite `refresh_tokens` table — only its hash.
+
+### Background prune scheduler
+A `PruneScheduler` async task runs for the app lifespan, sweeping
+expired/consumed/revoked refresh tokens every `REFRESH_PRUNE_INTERVAL_SECONDS`
+(default 1h). Start is idempotent, shutdown cancels cleanly, and a failing prune
+never kills the loop. Verified live: the scheduler logged a sweep that removed a
+consumed token.
+
+### Live Dynatrace management-zone pull
+The zone→venue map now comes from a `ZoneSource`:
+- `StaticZoneSource` — from `VENUE_ZONE_MAP` config (Round 7 behaviour);
+- `DynatraceZoneSource` — pulls management zones from the Dynatrace config API
+  (`/api/config/v1/managementZones`) when a tenant + token are configured.
+
+`build_zone_source` selects live when a tenant is present, else static. Static
+config entries always override the live map, and any API error falls back to
+static — the optional live source never hard-fails the resolver.
+
+### Tests
+Backend **290 pass** (+12 this round: hash-at-rest, scheduler, zone sources).
+Frontend `tsc -b` + `vite build` green.

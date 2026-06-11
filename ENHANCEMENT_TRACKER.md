@@ -354,3 +354,56 @@ Both tracks, full scope.
 - **Z2:** docs + package.
 
 ### Round 7 — COMPLETE
+
+---
+
+## Round 8 — Hash tokens at rest + prune scheduler + live Dynatrace zone pull
+
+### Track E — hash refresh tokens at rest
+| # | Sprint | Status |
+|---|--------|--------|
+| E1 | Store SHA-256 hash of refresh token; raw token only returned to client | 🟢 |
+| E2 | Lookup/rotate/revoke by hash; reuse-detection preserved | 🟢 |
+| E3 | Tests: hashed-at-rest (raw token absent from store) + all flows green | 🟢 |
+
+### Track F — background prune scheduler
+| # | Sprint | Status |
+|---|--------|--------|
+| F1 | AsyncPruneScheduler (interval task) started on app lifespan | 🟢 |
+| F2 | Config interval; safe start/stop; logs swept count | 🟢 |
+| F3 | Tests: scheduler sweeps expired/consumed; clean shutdown | 🟢 |
+
+### Track G — live Dynatrace management-zone pull
+| # | Sprint | Status |
+|---|--------|--------|
+| G1 | Zone-source protocol; static(config) + Dynatrace-API implementations | 🟢 |
+| G2 | Resolver consumes zone map from the source (live or static) | 🟢 |
+| G3 | Tests: live zone-source mapping + fallback to static/config | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| Y1 | Full backend suite + frontend tsc/build green | 🟢 |
+| Y2 | Docs + package | 🟢 |
+
+### Round 8 changelog
+- **Track E — hash tokens at rest (E1–E3):** `RefreshStore` now stores only the
+  SHA-256 hash of each refresh token; the raw token is returned to the client
+  once and never persisted. Lookup/rotate/revoke hash the presented token.
+  +2 tests proving the raw token is absent from both the memory store and the
+  SQLite table (only the hash is the primary key).
+- **Track F — background prune scheduler (F1–F3):** `PruneScheduler` async
+  interval task started/stopped on the app lifespan; configurable
+  `REFRESH_PRUNE_INTERVAL_SECONDS`; idempotent start, clean cancel-on-shutdown,
+  survives prune errors. +4 tests. Live-verified: scheduler logged a sweep.
+- **Track G — live Dynatrace zone pull (G1–G3):** `ZoneSource` protocol with
+  `StaticZoneSource` (config) and `DynatraceZoneSource` (pulls management zones
+  from the DT config API), selected by `build_zone_source` on tenant presence.
+  Resolver consumes the map from the source; static config always overrides;
+  any API error falls back to static. +6 tests (live pull via MockTransport,
+  fallback, override, builder selection).
+- **Y1:** backend **290 pass**; frontend `tsc -b` + `vite build` green; 7 node
+  RBAC unit tests pass.
+- **Y2:** docs + package.
+
+### Round 8 — COMPLETE

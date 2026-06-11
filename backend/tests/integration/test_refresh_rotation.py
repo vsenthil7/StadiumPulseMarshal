@@ -138,3 +138,44 @@ async def test_sql_backed_rotation_and_prune(tmp_path):
         assert removed >= 1
     finally:
         await db.dispose()
+
+
+# ── Track E: tokens are hashed at rest ──────────────────────────────────────
+@pytest.mark.asyncio
+async def test_raw_token_is_not_stored():
+    import hashlib
+    from app.repositories.refresh_tokens import MemoryRefreshTokenRepository
+
+    repo = MemoryRefreshTokenRepository()
+    s = RefreshStore(repo=repo)
+    raw, fam = await s.issue("zoe")
+    # The raw token must NOT be a key in the store; only its SHA-256 hash is.
+    assert await repo.get(raw) is None
+    h = hashlib.sha256(raw.encode()).hexdigest()
+    assert await repo.get(h) is not None
+    # The store still validates the raw token presented by the client.
+    assert await s.subject_for(raw) == "zoe"
+
+
+@pytest.mark.asyncio
+async def test_sql_hashes_token_at_rest(tmp_path):
+    import hashlib
+    import sqlite3
+    from app.repositories.sql.database import Database
+    from app.repositories.refresh_tokens import SQLRefreshTokenRepository
+
+    dbpath = tmp_path / "rt-hash.db"
+    db = Database(f"sqlite+aiosqlite:///{dbpath}")
+    await db.create_all()
+    try:
+        s = RefreshStore(repo=SQLRefreshTokenRepository(db))
+        raw, _ = await s.issue("sql-zoe")
+        h = hashlib.sha256(raw.encode()).hexdigest()
+    finally:
+        await db.dispose()
+    # Inspect the raw DB: the stored primary key is the hash, never the raw token.
+    con = sqlite3.connect(dbpath)
+    stored = [r[0] for r in con.execute("select token from refresh_tokens").fetchall()]
+    con.close()
+    assert h in stored
+    assert raw not in stored

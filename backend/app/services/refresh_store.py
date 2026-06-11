@@ -12,6 +12,7 @@ Implements the OAuth2 refresh-token rotation pattern over a pluggable
 """
 from __future__ import annotations
 
+import hashlib
 import secrets
 import time
 
@@ -30,6 +31,13 @@ class ReuseError(RuntimeError):
         self.family_id = family_id
 
 
+def _hash(token: str) -> str:
+    """SHA-256 of a refresh token. Only the hash is persisted, so a database
+    leak does not expose usable tokens (the raw token is shown to the client
+    once and never stored)."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 class RefreshStore:
     def __init__(
         self,
@@ -40,23 +48,26 @@ class RefreshStore:
         self.ttl_seconds = ttl_seconds
 
     async def issue(self, subject: str, family_id: str | None = None) -> tuple[str, str]:
-        """Issue a refresh token. Starts a new family unless one is given."""
+        """Issue a refresh token. Returns the RAW token (shown once to the
+        client) while persisting only its hash. Starts a new family unless one
+        is given."""
         fam = family_id or secrets.token_urlsafe(12)
-        token = secrets.token_urlsafe(32)
+        raw = secrets.token_urlsafe(32)
         await self._repo.add(RefreshRecord(
-            token=token, family_id=fam, subject=subject,
+            token=_hash(raw), family_id=fam, subject=subject,
             expires_at=time.time() + self.ttl_seconds,
         ))
-        return token, fam
+        return raw, fam
 
     async def rotate(self, presented: str) -> tuple[str, str] | None:
         """Validate + consume a token and issue its successor.
 
-        Returns ``(new_token, family_id)``; ``None`` if unknown/expired/revoked.
-        On reuse (a consumed token presented again) revokes the family and
-        raises ``ReuseError``.
+        Returns ``(new_raw_token, family_id)``; ``None`` if
+        unknown/expired/revoked. On reuse (a consumed token presented again)
+        revokes the family and raises ``ReuseError``.
         """
-        rec = await self._repo.get(presented)
+        h = _hash(presented)
+        rec = await self._repo.get(h)
         if rec is None:
             return None
         if rec.revoked or await self._repo.is_family_revoked(rec.family_id):
@@ -66,11 +77,11 @@ class RefreshStore:
         if rec.consumed:
             await self._repo.revoke_family(rec.family_id)
             raise ReuseError(rec.family_id)
-        await self._repo.mark_consumed(presented)
+        await self._repo.mark_consumed(h)
         return await self.issue(rec.subject, family_id=rec.family_id)
 
     async def subject_for(self, presented: str) -> str | None:
-        rec = await self._repo.get(presented)
+        rec = await self._repo.get(_hash(presented))
         if rec is None or not rec.is_live:
             return None
         if await self._repo.is_family_revoked(rec.family_id):
@@ -81,7 +92,7 @@ class RefreshStore:
         await self._repo.revoke_family(family_id)
 
     async def revoke_token(self, presented: str) -> None:
-        rec = await self._repo.get(presented)
+        rec = await self._repo.get(_hash(presented))
         if rec is not None:
             await self._repo.revoke_family(rec.family_id)
 

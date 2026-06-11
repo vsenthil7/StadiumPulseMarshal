@@ -78,16 +78,31 @@ class AppContext:
         from app.services.refresh_store import RefreshStore
 
         self.refresh_tokens = RefreshStore(repo=self.repos.refresh_tokens)
+        from app.services.prune_scheduler import PruneScheduler
+
+        self.prune_scheduler = PruneScheduler(
+            self.refresh_tokens.prune,
+            interval_seconds=self.settings.refresh_prune_interval_seconds,
+        )
         self.current_scenario = self._initial_scenario()
 
     async def ensure_entity_venue_map(self) -> None:
-        """Populate the entity→venue resolver lazily from the active client."""
+        """Populate the entity→venue resolver lazily from the active client.
+
+        The zone→venue map comes from a ``ZoneSource`` — live Dynatrace
+        management zones when a tenant is configured, else static config."""
         if not self.entity_venue.loaded:
+            from app.services.zone_source import build_zone_source
+
+            try:
+                zone_mapping = await build_zone_source(self.settings).zone_to_venue()
+            except Exception:  # pragma: no cover - defensive
+                zone_mapping = self.settings.venue_zone_mapping
             try:
                 entities = await self.client.list_entities()
                 self.entity_venue.load(
                     entities,
-                    zone_mapping=self.settings.venue_zone_mapping,
+                    zone_mapping=zone_mapping,
                     zone_tag_key=self.settings.venue_zone_tag_key,
                 )
             except Exception:  # pragma: no cover - defensive
@@ -164,6 +179,7 @@ class AppContext:
             raise ConfigurationError("; ".join(problems))
         await self.repos.init()
         self.relay.start()
+        self.prune_scheduler.start()
 
     async def probe_readiness(self) -> dict:
         """Actively probe dependencies for the readiness endpoint."""
@@ -184,6 +200,7 @@ class AppContext:
         return checks
 
     async def shutdown(self) -> None:
+        await self.prune_scheduler.stop()
         await self.relay.stop()
         await self.client.close()
         await self.repos.dispose()

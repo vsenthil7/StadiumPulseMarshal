@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     # The entity-tag key that carries the zone name (default: "mz").
     venue_zone_map: str = Field(default="")
     venue_zone_tag_key: str = Field(default="mz")
+    # How often (seconds) to sweep expired/consumed/revoked refresh tokens.
+    refresh_prune_interval_seconds: float = Field(default=3600.0)
 
     @property
     def venue_zone_mapping(self) -> dict[str, str]:
