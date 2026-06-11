@@ -135,3 +135,86 @@ class MemorySLORepository(SLORepository):
 
     async def list_budgets(self) -> list[ErrorBudget]:
         return list(self._budgets.values())
+
+
+class MemoryOutboxRepository:
+    """In-memory outbox (relay still provides at-least-once within a run)."""
+
+    def __init__(self) -> None:
+        self._items: dict[str, object] = {}
+
+    async def add(self, entry):
+        self._items[entry.id] = entry
+        return entry
+
+    async def list_pending(self, *, limit: int = 100):
+        from app.models.outbox import OutboxStatus
+
+        pending = [
+            e for e in self._items.values()
+            if e.status == OutboxStatus.PENDING  # type: ignore[attr-defined]
+        ]
+        pending.sort(key=lambda e: e.created_at)  # type: ignore[attr-defined]
+        return pending[:limit]
+
+    async def mark_dispatched(self, entry_id: str) -> None:
+        from datetime import datetime, timezone
+
+        from app.models.outbox import OutboxStatus
+
+        e = self._items.get(entry_id)
+        if e is not None:
+            e.status = OutboxStatus.DISPATCHED  # type: ignore[attr-defined]
+            e.dispatched_at = datetime.now(timezone.utc)  # type: ignore[attr-defined]
+
+    async def mark_failed(self, entry_id: str, error: str) -> None:
+        from app.models.outbox import OutboxStatus
+
+        e = self._items.get(entry_id)
+        if e is not None:
+            e.attempts += 1  # type: ignore[attr-defined]
+            e.last_error = error  # type: ignore[attr-defined]
+            e.status = OutboxStatus.FAILED  # type: ignore[attr-defined]
+
+    async def list_all(self):
+        return list(self._items.values())
+
+
+class MemoryAuditLogRepository:
+    def __init__(self) -> None:
+        self._items: list = []
+
+    async def add(self, entry):
+        self._items.append(entry)
+        return entry
+
+    async def query(
+        self,
+        *,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+        actor: str | None = None,
+        action: str | None = None,
+        after_cursor: str | None = None,
+        limit: int = 50,
+    ):
+        items = sorted(self._items, key=lambda e: e.id)
+        out = []
+        for e in items:
+            if after_cursor is not None and e.id <= after_cursor:
+                continue
+            if resource_type is not None and e.resource_type != resource_type:
+                continue
+            if resource_id is not None and e.resource_id != resource_id:
+                continue
+            if actor is not None and e.actor != actor:
+                continue
+            if action is not None and e.action != action:
+                continue
+            out.append(e)
+            if len(out) >= limit:
+                break
+        return out
+
+    async def count(self) -> int:
+        return len(self._items)

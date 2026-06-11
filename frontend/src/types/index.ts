@@ -137,6 +137,7 @@ export interface Incident {
   timeline: IncidentEvent[];
   remediation_ids: string[];
   impact_summary: string;
+  version: number;
 }
 
 export interface Page {
@@ -202,6 +203,8 @@ export interface WebhookSubscription {
   last_status: number | null;
   last_delivery_at: string | null;
   failure_count: number;
+  dead_lettered?: boolean;
+  attempts_log?: DeliveryAttempt[];
 }
 
 export interface SLOTrend {
@@ -234,4 +237,31 @@ export interface Postmortem {
 export interface ReadyState {
   status: string;
   checks: Record<string, string>;
+}
+
+// --- Phase 4 types ---
+export interface AuditEntry {
+  id: string;
+  actor: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  at: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface AuditCursorPage {
+  limit: number;
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface DeliveryAttempt {
+  attempt: number;
+  at: string;
+  status_code: number | null;
+  error: string;
+  success: boolean;
 }

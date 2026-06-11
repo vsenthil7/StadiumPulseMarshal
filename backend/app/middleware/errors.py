@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse
 from app.core.errors import AppError, RateLimitedError, error_envelope
 from app.core.logging import get_logger
 from app.middleware.correlation import get_request_id
+from app.middleware.tracing import get_trace_id
 
 log = get_logger(__name__)
 
@@ -39,7 +40,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         log.warning("AppError %s: %s [%s]", exc.code, exc.message, rid)
         return JSONResponse(
             status_code=exc.status_code,
-            content=error_envelope(exc.code, exc.message, rid, exc.details),
+            content=error_envelope(exc.code, exc.message, rid, exc.details, get_trace_id()),
             headers=headers,
         )
 
@@ -50,7 +51,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         detail = exc.detail if isinstance(exc.detail, str) else "error"
         return JSONResponse(
             status_code=exc.status_code,
-            content=error_envelope(code, detail, rid),
+            content=error_envelope(code, detail, rid, trace_id=get_trace_id()),
             headers=getattr(exc, "headers", None) or {},
         )
 
@@ -63,7 +64,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=422,
             content=error_envelope(
                 "validation_error", "Request validation failed", rid,
-                {"errors": exc.errors()},
+                {"errors": exc.errors()}, get_trace_id(),
             ),
         )
 
@@ -73,5 +74,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         log.exception("Unhandled error [%s]: %s", rid, exc)
         return JSONResponse(
             status_code=500,
-            content=error_envelope("internal_error", "Internal server error", rid),
+            content=error_envelope("internal_error", "Internal server error", rid, trace_id=get_trace_id()),
         )

@@ -81,3 +81,40 @@ class SLORepository(ABC):
 
     @abstractmethod
     async def list_budgets(self) -> list[ErrorBudget]: ...
+
+
+class OutboxRepository(ABC):
+    @abstractmethod
+    async def add(self, entry) -> object: ...
+
+    @abstractmethod
+    async def list_pending(self, *, limit: int = 100) -> list: ...
+
+    @abstractmethod
+    async def mark_dispatched(self, entry_id: str) -> None: ...
+
+    @abstractmethod
+    async def mark_failed(self, entry_id: str, error: str) -> None: ...
+
+    @abstractmethod
+    async def list_all(self) -> list: ...
+
+
+class AuditLogRepository(ABC):
+    @abstractmethod
+    async def add(self, entry) -> object: ...
+
+    @abstractmethod
+    async def query(
+        self,
+        *,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+        actor: str | None = None,
+        action: str | None = None,
+        after_cursor: str | None = None,
+        limit: int = 50,
+    ) -> list: ...
+
+    @abstractmethod
+    async def count(self) -> int: ...

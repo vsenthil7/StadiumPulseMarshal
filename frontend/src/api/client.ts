@@ -179,3 +179,82 @@ export const apiP3 = {
   deleteWebhook: (id: string) =>
     fetch(`/api/v1/webhooks/${id}`, { method: 'DELETE' }).then((r) => r.ok),
 };
+
+// --- Phase 4 API (resilient layer) ---
+import { request } from './http';
+import type { AuditCursorPage, AuditEntry, WebhookSubscription as WHSub } from '../types';
+
+export const apiP4 = {
+  // Idempotent incident creation: pass a client-generated key.
+  createIncidentIdempotent: (
+    problemId: string,
+    idempotencyKey: string,
+    venueId?: string,
+  ) =>
+    request<{ incident: import('../types').Incident }>('/incidents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({ problem_id: problemId, venue_id: venueId }),
+    }).then((r) => r.incident),
+
+  // Version-aware transition for optimistic concurrency.
+  transitionWithVersion: (
+    id: string,
+    target: string,
+    actor: string,
+    expectedVersion: number,
+    signal?: AbortSignal,
+  ) =>
+    request<{ incident: import('../types').Incident }>(
+      `/incidents/${id}/transition`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          target,
+          actor,
+          expected_version: expectedVersion,
+        }),
+        signal,
+      },
+    ).then((r) => r.incident),
+
+  queryAudit: (
+    params: {
+      resourceType?: string;
+      actor?: string;
+      action?: string;
+      cursor?: string;
+      limit?: number;
+    } = {},
+    signal?: AbortSignal,
+  ) => {
+    const q = new URLSearchParams();
+    if (params.resourceType) q.set('resource_type', params.resourceType);
+    if (params.actor) q.set('actor', params.actor);
+    if (params.action) q.set('action', params.action);
+    if (params.cursor) q.set('cursor', params.cursor);
+    q.set('limit', String(params.limit ?? 50));
+    return request<{ entries: AuditEntry[]; page: AuditCursorPage }>(
+      `/audit-log?${q.toString()}`,
+      { signal },
+    );
+  },
+
+  listDeadLettered: (signal?: AbortSignal) =>
+    request<{ webhooks: WHSub[] }>('/webhooks/dead-letter/list', { signal }).then(
+      (r) => r.webhooks,
+    ),
+
+  redriveWebhook: (id: string) =>
+    request<{ webhook: WHSub }>(`/webhooks/${id}/redrive`, {
+      method: 'POST',
+    }).then((r) => r.webhook),
+};
+
+// Small helper to generate idempotency keys client-side.
+export function newIdempotencyKey(): string {
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}

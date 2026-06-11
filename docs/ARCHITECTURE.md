@@ -213,3 +213,66 @@ repository contract suite run against both persistence backends.
 **187 tests, 100% backend statement coverage**, including middleware, metrics,
 RBAC, event bus, webhooks, rate limiting, SLO history, postmortems, and the new
 routes.
+
+---
+
+## Phase 4 — Reliability & Distributed-Systems Correctness
+
+### Transactional outbox (`app/models/outbox.py`, `app/services/outbox_relay.py`)
+Domain events are written to a durable outbox in the same store as the state
+change, then an `OutboxRelay` drains PENDING entries to the event bus and marks
+them DISPATCHED. This gives at-least-once delivery that survives a crash between
+DB commit and delivery — no lost events. Both memory and SQL outbox repos.
+
+### Webhook retry / dead-letter (`app/services/webhook_service.py`)
+Delivery now retries with bounded exponential backoff; after `max_attempts`
+consecutive failures the subscription is **dead-lettered** (excluded from
+matching until redriven). Every attempt is recorded in a per-subscription
+delivery log. Endpoints: `GET /webhooks/dead-letter/list`,
+`POST /webhooks/{id}/redrive`.
+
+### Idempotency (`app/services/idempotency.py`)
+`Idempotency-Key` on incident creation → first call executes and stores the
+response; replays return the stored response with no duplicate side effect.
+Keys are namespaced per operation; LRU-bounded store.
+
+### Optimistic concurrency (`app/models/incident.py`, incident service)
+Incidents carry a `version`; transitions accept `expected_version` and raise
+`StaleVersionError` → **409** when the version is stale, preventing silent
+lost-update races between concurrent operators.
+
+### First-class audit log (`app/models/audit.py`, `app/services/audit_service.py`)
+Every mutation records an `AuditEntry` (actor, action, resource, before/after).
+Time-sortable ids double as opaque pagination cursors. Queryable + cursor-paged
+via `GET /audit-log`. Memory and SQL repos; survives restart under SQL.
+
+### Trace context (`app/middleware/tracing.py`)
+W3C `traceparent` is parsed and continued (or a new trace is started), a child
+span id is generated, the trace id is echoed on responses and included in error
+envelopes — interoperable with OpenTelemetry collectors.
+
+### Cursor pagination (`app/api/routes_audit.py`)
+Opaque, stable cursors (`next_cursor` / `has_more`) walk large sets without
+duplicates or gaps under concurrent inserts.
+
+### Config self-check + active readiness (`app/core/config.py`)
+`validate_for_startup()` fails fast with a clear message on inconsistent config
+(auth without secret, live mode without a backend, bad limits). `/ready` now
+actively probes the observability client and persistence rather than reporting
+static state.
+
+### Frontend (`src/api/http.ts`, new pages/components)
+- **Resilient HTTP layer**: typed `ApiError` from the error envelope, retry with
+  backoff on transient failures (GET), and `AbortController` cancellation.
+- **Optimistic updates with rollback** and version-aware transitions (409 →
+  refresh + toast) on the Incidents page.
+- **Idempotent incident creation** with client-generated keys.
+- **Audit log page** (cursor-paged, filterable, request-cancelling).
+- **Dead-letter panel** with redrive on the Webhooks page.
+- **Skeleton loaders** and basic **accessibility** (sr-only labels, aria-busy,
+  labelled controls).
+
+### Testing
+**220 tests, 100% backend statement coverage**, including the outbox + relay,
+webhook retry/dead-letter/redrive, idempotency, optimistic concurrency, audit
+(memory + SQL), trace parsing, cursor pagination, and config self-check.

@@ -135,16 +135,18 @@ async def test_webhook_dispatcher_delivers_and_records():
         return httpx.Response(500)
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    dispatcher = WebhookDispatcher(repo, http)
+    dispatcher = WebhookDispatcher(repo, http, max_attempts=3, base_backoff=0.001)
     bus = EventBus()
     dispatcher.register(bus)
     await bus.publish(DomainEvent(type=EventType.INCIDENT_CREATED, subject_id="I1"))
-    statuses = sorted(
-        (s.last_status for s in repo.list()), key=lambda x: x or 0
-    )
-    assert 200 in statuses
-    # the failing one recorded a failure
-    assert any(s.failure_count == 1 for s in repo.list())
+    ok = [s for s in repo.list() if s.url.endswith("/ok")][0]
+    fail = [s for s in repo.list() if s.url.endswith("/fail")][0]
+    assert ok.last_status == 200 and not ok.dead_lettered
+    assert len(ok.attempts_log) == 1
+    # the failing one retried to exhaustion and got dead-lettered
+    assert fail.dead_lettered is True
+    assert len(fail.attempts_log) == 3
+    assert fail.failure_count == 3
 
 
 async def test_webhook_dispatcher_skips_unsubscribed():
@@ -174,10 +176,12 @@ async def test_webhook_dispatcher_network_exception():
         raise httpx.ConnectError("unreachable")
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    dispatcher = WebhookDispatcher(repo, http)
+    dispatcher = WebhookDispatcher(repo, http, max_attempts=2, base_backoff=0.001)
     await dispatcher.on_event(DomainEvent(type=EventType.INCIDENT_CREATED))
-    assert repo.list()[0].failure_count == 1
-    assert repo.list()[0].last_status is None
+    sub = repo.list()[0]
+    assert sub.failure_count == 2
+    assert sub.last_status is None
+    assert sub.dead_lettered is True
 
 
 # --- incident search & bulk ---

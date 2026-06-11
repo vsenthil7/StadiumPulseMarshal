@@ -1,7 +1,7 @@
 """Incident lifecycle API routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from app.api.auth import require_permission
 from app.rbac.policy import Permission
@@ -15,7 +15,7 @@ from app.api.schemas_ext import (
     TransitionRequest,
 )
 from app.core.context import AppContext
-from app.services.incident_service import IncidentError
+from app.services.incident_service import IncidentError, StaleVersionError
 
 router = APIRouter(prefix="/api/v1/incidents", tags=["incidents"])
 
@@ -47,16 +47,28 @@ async def list_incidents(
 async def create_incident(
     request: Request,
     body: CreateIncidentRequest,
+    idempotency_key: str | None = Header(default=None),
     _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    # Idempotent replay: same key returns the stored response, no new incident.
+    if idempotency_key:
+        cached = ctx.idempotency.get("incident:create", idempotency_key)
+        if cached is not None:
+            return IncidentResponse(**cached["body"])
     problem = await ctx.client.get_problem(body.problem_id)
     if problem is None:
         raise HTTPException(status_code=404, detail="Problem not found")
     incident = await ctx.incidents.create_from_problem(
         problem, venue_id=body.venue_id, match_id=body.match_id
     )
-    return IncidentResponse(incident=incident)
+    response = IncidentResponse(incident=incident)
+    if idempotency_key:
+        ctx.idempotency.put(
+            "incident:create", idempotency_key, 201,
+            response.model_dump(mode="json"),
+        )
+    return response
 
 
 @router.get("/{incident_id}", response_model=IncidentResponse)
@@ -81,8 +93,11 @@ async def transition_incident(
     ctx = _ctx(request)
     try:
         incident = await ctx.incidents.transition(
-            incident_id, body.target, actor=body.actor, note=body.note
+            incident_id, body.target, actor=body.actor, note=body.note,
+            expected_version=body.expected_version,
         )
+    except StaleVersionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except IncidentError as exc:
         # 404 for missing, 409 for illegal transition.
         msg = str(exc)

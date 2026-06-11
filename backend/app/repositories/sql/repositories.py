@@ -228,3 +228,119 @@ class SQLSLORepository(SLORepository):
         async with self._db.session() as s:
             rows = (await s.execute(select(BudgetRow))).scalars().all()
             return [ErrorBudget.model_validate(r.document) for r in rows]
+
+
+class SQLOutboxRepository:
+    def __init__(self, db) -> None:
+        self._db = db
+
+    async def add(self, entry):
+        from app.repositories.sql.database import OutboxRow
+
+        async with self._db.session() as s:
+            s.add(OutboxRow(
+                id=entry.id, status=entry.status.value,
+                created_at=entry.created_at.isoformat(),
+                document=entry.model_dump(mode="json"),
+            ))
+            await s.commit()
+        return entry
+
+    async def list_pending(self, *, limit: int = 100):
+        from app.models.outbox import OutboxEntry, OutboxStatus
+        from app.repositories.sql.database import OutboxRow
+
+        async with self._db.session() as s:
+            rows = (await s.execute(
+                select(OutboxRow)
+                .where(OutboxRow.status == OutboxStatus.PENDING.value)
+                .order_by(OutboxRow.created_at)
+                .limit(limit)
+            )).scalars().all()
+            return [OutboxEntry(**r.document) for r in rows]
+
+    async def mark_dispatched(self, entry_id: str) -> None:
+        from datetime import datetime, timezone
+
+        from app.models.outbox import OutboxEntry, OutboxStatus
+        from app.repositories.sql.database import OutboxRow
+
+        async with self._db.session() as s:
+            row = await s.get(OutboxRow, entry_id)
+            if row is not None:
+                entry = OutboxEntry(**row.document)
+                entry.status = OutboxStatus.DISPATCHED
+                entry.dispatched_at = datetime.now(timezone.utc)
+                row.status = entry.status.value
+                row.document = entry.model_dump(mode="json")
+                await s.commit()
+
+    async def mark_failed(self, entry_id: str, error: str) -> None:
+        from app.models.outbox import OutboxEntry, OutboxStatus
+        from app.repositories.sql.database import OutboxRow
+
+        async with self._db.session() as s:
+            row = await s.get(OutboxRow, entry_id)
+            if row is not None:
+                entry = OutboxEntry(**row.document)
+                entry.attempts += 1
+                entry.last_error = error
+                entry.status = OutboxStatus.FAILED
+                row.status = entry.status.value
+                row.document = entry.model_dump(mode="json")
+                await s.commit()
+
+    async def list_all(self):
+        from app.models.outbox import OutboxEntry
+        from app.repositories.sql.database import OutboxRow
+
+        async with self._db.session() as s:
+            rows = (await s.execute(select(OutboxRow))).scalars().all()
+            return [OutboxEntry(**r.document) for r in rows]
+
+
+class SQLAuditLogRepository:
+    def __init__(self, db) -> None:
+        self._db = db
+
+    async def add(self, entry):
+        from app.repositories.sql.database import AuditLogRow
+
+        async with self._db.session() as s:
+            s.add(AuditLogRow(
+                id=entry.id, resource_type=entry.resource_type,
+                resource_id=entry.resource_id, actor=entry.actor,
+                action=entry.action, document=entry.model_dump(mode="json"),
+            ))
+            await s.commit()
+        return entry
+
+    async def query(
+        self, *, resource_type=None, resource_id=None, actor=None,
+        action=None, after_cursor=None, limit: int = 50,
+    ):
+        from app.models.audit import AuditEntry
+        from app.repositories.sql.database import AuditLogRow
+
+        async with self._db.session() as s:
+            q = select(AuditLogRow).order_by(AuditLogRow.id)
+            if resource_type is not None:
+                q = q.where(AuditLogRow.resource_type == resource_type)
+            if resource_id is not None:
+                q = q.where(AuditLogRow.resource_id == resource_id)
+            if actor is not None:
+                q = q.where(AuditLogRow.actor == actor)
+            if action is not None:
+                q = q.where(AuditLogRow.action == action)
+            if after_cursor is not None:
+                q = q.where(AuditLogRow.id > after_cursor)
+            rows = (await s.execute(q.limit(limit))).scalars().all()
+            return [AuditEntry(**r.document) for r in rows]
+
+    async def count(self) -> int:
+        from app.repositories.sql.database import AuditLogRow
+
+        async with self._db.session() as s:
+            return (await s.execute(
+                select(func.count()).select_from(AuditLogRow)
+            )).scalar_one()

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="'IBM Plex Sans', Segoe UI, sans-serif">
+  <rect width="1200" height="700" fill="#f4f6f9"/>
+  <!-- topbar -->
+  <rect width="1200" height="55" fill="#ffffff"/>
+  <line x1="0" y1="55" x2="1200" y2="55" stroke="#e2e7ee"/>
+  <rect x="20" y="13" width="30" height="30" rx="8" fill="#0b6e4f"/>
+  <text x="35" y="33" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">SP</text>
+  <text x="61" y="34" fill="#11202e" font-size="15" font-weight="700">StadiumPulse Marshal</text>
+  <text x="300" y="34" fill="#7387a0" font-size="13" font-weight="600">Triage</text>
+  <text x="365" y="34" fill="#7387a0" font-size="13" font-weight="600">Incidents</text>
+  <text x="450" y="34" fill="#7387a0" font-size="13" font-weight="600">Reliability</text>
+  <text x="540" y="34" fill="#7387a0" font-size="13" font-weight="600">Scenarios</text>
+  <text x="630" y="34" fill="#7387a0" font-size="13" font-weight="600">Webhooks</text>
+  <rect x="715" y="16" width="62" height="26" rx="7" fill="#eef5f1"/>
+  <text x="746" y="34" fill="#08543c" font-size="13" font-weight="700" text-anchor="middle">Audit</text>
+  <text x="980" y="34" fill="#2f8f5b" font-size="11" font-weight="600" font-family="'IBM Plex Mono', monospace">● live (3)</text>
+
+  <!-- audit panel -->
+  <rect x="20" y="75" width="1160" height="600" rx="10" fill="#ffffff" stroke="#e2e7ee"/>
+  <rect x="20" y="75" width="1160" height="44" rx="10" fill="#fafbfc"/>
+  <rect x="20" y="105" width="1160" height="14" fill="#fafbfc"/>
+  <line x1="20" y1="119" x2="1180" y2="119" stroke="#e2e7ee"/>
+  <text x="36" y="102" fill="#11202e" font-size="14" font-weight="700">Audit log</text>
+  <rect x="1020" y="84" width="140" height="28" rx="7" fill="#ffffff" stroke="#cbd4e0"/>
+  <text x="1036" y="102" fill="#43566a" font-size="12" font-family="'IBM Plex Mono', monospace">all actions ▾</text>
+
+  <!-- table header -->
+  <g font-size="11" fill="#7387a0" font-weight="600">
+    <text x="40" y="142">TIME</text>
+    <text x="180" y="142">ACTOR</text>
+    <text x="320" y="142">ACTION</text>
+    <text x="560" y="142">RESOURCE</text>
+    <text x="800" y="142">CHANGE</text>
+  </g>
+  <line x1="36" y1="150" x2="1164" y2="150" stroke="#cbd4e0" stroke-width="2"/>
+
+  <!-- rows -->
+  <g font-size="12.5">
+    <text x="40" y="176" fill="#43566a" font-family="'IBM Plex Mono', monospace">07:45:22</text>
+    <text x="180" y="176" fill="#11202e">sre-operator</text>
+    <rect x="320" y="164" width="150" height="18" rx="5" fill="#eaf1fc"/>
+    <text x="328" y="177" fill="#1455c0" font-size="11" font-family="'IBM Plex Mono', monospace">incident.transition</text>
+    <text x="560" y="176" fill="#43566a" font-family="'IBM Plex Mono', monospace">incident/INC-28131df3</text>
+    <text x="800" y="176" fill="#7387a0" font-family="'IBM Plex Mono', monospace" font-size="11">{"state":"DETECTED"} → {"state":"ACKNOWLEDGED"}</text>
+    <line x1="36" y1="190" x2="1164" y2="190" stroke="#eef2f7"/>
+
+    <text x="40" y="216" fill="#43566a" font-family="'IBM Plex Mono', monospace">07:45:22</text>
+    <text x="180" y="216" fill="#11202e">system</text>
+    <rect x="320" y="204" width="120" height="18" rx="5" fill="#eaf1fc"/>
+    <text x="328" y="217" fill="#1455c0" font-size="11" font-family="'IBM Plex Mono', monospace">incident.create</text>
+    <text x="560" y="216" fill="#43566a" font-family="'IBM Plex Mono', monospace">incident/INC-28131df3</text>
+    <text x="800" y="216" fill="#7387a0" font-family="'IBM Plex Mono', monospace" font-size="11">{"state":"DETECTED","severity":"HIGH"}</text>
+    <line x1="36" y1="230" x2="1164" y2="230" stroke="#eef2f7"/>
+
+    <text x="40" y="256" fill="#43566a" font-family="'IBM Plex Mono', monospace">07:44:58</text>
+    <text x="180" y="256" fill="#11202e">responder-2</text>
+    <rect x="320" y="244" width="150" height="18" rx="5" fill="#eaf1fc"/>
+    <text x="328" y="257" fill="#1455c0" font-size="11" font-family="'IBM Plex Mono', monospace">incident.transition</text>
+    <text x="560" y="256" fill="#43566a" font-family="'IBM Plex Mono', monospace">incident/INC-9f2a1b04</text>
+    <text x="800" y="256" fill="#7387a0" font-family="'IBM Plex Mono', monospace" font-size="11">{"state":"INVESTIGATING"} → {"state":"RESOLVED"}</text>
+    <line x1="36" y1="270" x2="1164" y2="270" stroke="#eef2f7"/>
+  </g>
+
+  <rect x="40" y="290" width="120" height="34" rx="7" fill="#ffffff" stroke="#cbd4e0"/>
+  <text x="100" y="312" fill="#43566a" font-size="13" font-weight="600" text-anchor="middle">Load more</text>
+
+  <text x="40" y="380" fill="#11202e" font-size="13" font-weight="700">Reliability features visible here:</text>
+  <g font-size="12.5" fill="#43566a">
+    <text x="40" y="408">• Every mutation is recorded with actor, action, before/after — cursor-paginated and filterable.</text>
+    <text x="40" y="432">• Transitions are version-checked: a stale write returns 409 and the UI refreshes with a conflict toast.</text>
+    <text x="40" y="456">• Incident creation carries an idempotency key, so a retry never creates a duplicate.</text>
+    <text x="40" y="480">• Domain events flow through a transactional outbox + relay (at-least-once; survives restart).</text>
+    <text x="40" y="504">• Webhooks retry with backoff and dead-letter on repeated failure; redrive from the Webhooks tab.</text>
+    <text x="40" y="528">• W3C traceparent is propagated and echoed; trace ids appear in error envelopes.</text>
+  </g>
+
+  <text x="20" y="660" fill="#7387a0" font-size="12" font-style="italic">Figure 6 — Phase 4: queryable audit log with cursor pagination, backed by optimistic concurrency, idempotency, a transactional outbox, and webhook dead-lettering.</text>
+</svg>

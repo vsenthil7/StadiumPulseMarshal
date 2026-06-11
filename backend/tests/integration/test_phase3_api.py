@@ -40,7 +40,7 @@ def test_error_envelope_on_404(client):
     r = client.get("/api/v1/incidents/NOPE")
     body = r.json()
     assert r.status_code == 404
-    assert set(body["error"].keys()) == {"code", "message", "request_id", "details"}
+    assert {"code", "message", "request_id", "details"} <= set(body["error"].keys())
     assert body["error"]["code"] == "not_found"
 
 

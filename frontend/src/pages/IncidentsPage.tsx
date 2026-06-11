@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, apiExt, apiP3 } from '../api/client';
+import { api, apiExt, apiP3, apiP4, newIdempotencyKey } from '../api/client';
+import { ApiError } from '../api/http';
 import type { Incident, IncidentState, Postmortem, Problem } from '../types';
 import { IncidentLifecycle } from '../components/IncidentLifecycle';
 import { useToast } from '../store/ToastStore';
@@ -31,26 +32,45 @@ export function IncidentsPage({ operator }: { operator: string }) {
   const createFrom = useCallback(
     async (problemId: string) => {
       setBusy(true);
+      // Idempotency key guards against double-submit creating duplicates.
+      const key = newIdempotencyKey();
       try {
-        const inc = await apiExt.createIncident(problemId);
+        const inc = await apiP4.createIncidentIdempotent(problemId, key);
         await refresh();
         setSelected(inc);
+        notify('Incident opened', 'success');
+      } catch {
+        notify('Failed to open incident', 'error');
       } finally {
         setBusy(false);
       }
     },
-    [refresh],
+    [refresh, notify],
   );
 
   const transition = useCallback(
     async (target: IncidentState) => {
       if (!selected) return;
+      const previous = selected;
+      const expectedVersion = selected.version;
+      // Optimistic update: reflect the new state immediately, roll back on error.
+      setSelected({ ...selected, state: target, version: selected.version + 1 });
       setBusy(true);
       try {
-        const inc = await apiExt.transition(selected.id, target, operator);
+        const inc = await apiP4.transitionWithVersion(
+          previous.id, target, operator, expectedVersion,
+        );
         setSelected(inc);
         await refresh();
         notify(`Incident → ${target}`, 'success');
+      } catch (e) {
+        setSelected(previous); // rollback
+        if (e instanceof ApiError && e.status === 409) {
+          notify('Conflict: incident changed elsewhere. Refreshed.', 'error');
+          await refresh();
+        } else {
+          notify('Transition failed', 'error');
+        }
       } finally {
         setBusy(false);
       }

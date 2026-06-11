@@ -31,6 +31,10 @@ class IncidentError(Exception):
     """Raised on invalid incident operations (e.g. illegal transition)."""
 
 
+class StaleVersionError(IncidentError):
+    """Raised when an optimistic-concurrency version check fails."""
+
+
 def _new_id() -> str:
     return f"INC-{uuid.uuid4().hex[:8]}"
 
@@ -46,20 +50,36 @@ class IncidentService:
         escalation: EscalationEngine,
         notifications: NotificationService,
         events=None,
+        outbox=None,
+        audit=None,
     ) -> None:
         self._repo = repo
         self._escalation = escalation
         self._notifications = notifications
         self._events = events
+        self._outbox = outbox
+        self._audit = audit
 
     async def _emit(self, event_type, subject_id: str, **payload) -> None:
-        if self._events is None:
-            return
-        from app.events.bus import DomainEvent
+        """Emit a domain event.
 
-        await self._events.publish(
-            DomainEvent(type=event_type, subject_id=subject_id, payload=payload)
-        )
+        When an outbox is configured the event is persisted durably (the relay
+        delivers it), giving at-least-once semantics that survive a crash. Only
+        when no outbox is present do we publish directly to the bus.
+        """
+        from app.events.bus import DomainEvent
+        from app.models.outbox import OutboxEntry
+
+        event = DomainEvent(type=event_type, subject_id=subject_id, payload=payload)
+        if self._outbox is not None:
+            await self._outbox.add(OutboxEntry.from_event(event))
+            return
+        if self._events is not None:
+            await self._events.publish(event)
+
+    async def _audit_record(self, **kwargs) -> None:
+        if self._audit is not None:
+            await self._audit.record(**kwargs)
 
     # --- creation ----------------------------------------------------------
     async def create_from_problem(
@@ -90,6 +110,11 @@ class IncidentService:
             EventType.INCIDENT_CREATED, incident.id,
             title=incident.title, severity=incident.severity.value,
         )
+        await self._audit_record(
+            actor="system", action="incident.create",
+            resource_type="incident", resource_id=incident.id,
+            after={"state": incident.state.value, "severity": incident.severity.value},
+        )
         return incident
 
     async def get(self, incident_id: str) -> Incident | None:
@@ -111,15 +136,21 @@ class IncidentService:
     # --- lifecycle ---------------------------------------------------------
     async def transition(
         self, incident_id: str, target: IncidentState, *, actor: str = "system",
-        note: str = "",
+        note: str = "", expected_version: int | None = None,
     ) -> Incident:
         incident = await self._require(incident_id)
+        if expected_version is not None and incident.version != expected_version:
+            raise StaleVersionError(
+                f"Incident {incident_id} version is {incident.version}, "
+                f"expected {expected_version}"
+            )
         if not can_transition(incident.state, target):
             raise IncidentError(
                 f"Illegal transition {incident.state.value} -> {target.value}"
             )
         prev = incident.state
         incident.state = target
+        incident.version += 1
         if target == IncidentState.ACKNOWLEDGED and incident.acknowledged_at is None:
             incident.acknowledged_at = _now()
         if target == IncidentState.RESOLVED and incident.resolved_at is None:
@@ -138,6 +169,11 @@ class IncidentService:
         await self._emit(
             EventType.INCIDENT_STATE_CHANGED, incident.id,
             **{"from": prev.value, "to": target.value},
+        )
+        await self._audit_record(
+            actor=actor, action="incident.transition",
+            resource_type="incident", resource_id=incident.id,
+            before={"state": prev.value}, after={"state": target.value},
         )
         return incident
 

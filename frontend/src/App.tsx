@@ -4,13 +4,20 @@ import { ReliabilityPage } from './pages/ReliabilityPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { ScenariosPage } from './pages/ScenariosPage';
 import { WebhooksPage } from './pages/WebhooksPage';
+import { AuditLogPage } from './pages/AuditLogPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppStoreProvider, useAppStore } from './store/AppStore';
 import { ToastProvider } from './store/ToastStore';
 import { useLiveFeed } from './hooks/useLiveFeed';
 import './styles/app.css';
 
-type Tab = 'triage' | 'incidents' | 'reliability' | 'scenarios' | 'webhooks';
+type Tab =
+  | 'triage'
+  | 'incidents'
+  | 'reliability'
+  | 'scenarios'
+  | 'webhooks'
+  | 'audit';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'triage', label: 'Triage' },
@@ -18,6 +25,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'reliability', label: 'Reliability' },
   { id: 'scenarios', label: 'Scenarios' },
   { id: 'webhooks', label: 'Webhooks' },
+  { id: 'audit', label: 'Audit' },
 ];
 
 function Shell() {
@@ -75,6 +83,7 @@ function Shell() {
           <ScenariosPage onScenarioChange={(k) => setScenario(k)} />
         )}
         {tab === 'webhooks' && <WebhooksPage />}
+        {tab === 'audit' && <AuditLogPage />}
       </main>
     </div>
   );

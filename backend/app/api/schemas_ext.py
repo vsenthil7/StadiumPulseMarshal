@@ -36,6 +36,7 @@ class TransitionRequest(BaseModel):
     target: IncidentState
     actor: str = "sre-operator"
     note: str = ""
+    expected_version: int | None = None
 
 
 class AssignRequest(BaseModel):

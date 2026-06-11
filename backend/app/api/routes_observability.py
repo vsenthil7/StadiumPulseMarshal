@@ -21,11 +21,8 @@ async def metrics() -> PlainTextResponse:
 
 @router.get("/ready")
 async def ready(request: Request) -> dict:
-    """Readiness: report the state of each dependency subsystem."""
+    """Readiness: actively probe each dependency subsystem."""
     ctx = _ctx(request)
-    checks = {
-        "observability_client": ctx.client.mode,
-        "agent": ctx.agent.backend,
-        "persistence": "sql" if ctx.repos.database is not None else "memory",
-    }
-    return {"status": "ready", "checks": checks}
+    checks = await ctx.probe_readiness()
+    healthy = all(v.startswith("ok") for v in checks.values())
+    return {"status": "ready" if healthy else "degraded", "checks": checks}

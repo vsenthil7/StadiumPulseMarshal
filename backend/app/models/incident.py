@@ -117,6 +117,8 @@ class Incident(BaseModel):
     timeline: list[IncidentEvent] = Field(default_factory=list)
     remediation_ids: list[str] = Field(default_factory=list)
     impact_summary: str = ""
+    # Optimistic-concurrency version; incremented on each mutation.
+    version: int = 0
 
     @property
     def is_open(self) -> bool:

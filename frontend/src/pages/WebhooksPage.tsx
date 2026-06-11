@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiP3 } from '../api/client';
+import { apiP3, apiP4 } from '../api/client';
 import type { WebhookSubscription } from '../types';
 import { useToast } from '../store/ToastStore';
 import { fmtTime } from '../utils/format';
@@ -15,6 +15,7 @@ const EVENT_TYPES = [
 
 export function WebhooksPage() {
   const [hooks, setHooks] = useState<WebhookSubscription[]>([]);
+  const [deadLetter, setDeadLetter] = useState<WebhookSubscription[]>([]);
   const [url, setUrl] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -22,6 +23,7 @@ export function WebhooksPage() {
 
   const refresh = useCallback(() => {
     apiP3.listWebhooks().then(setHooks).catch(() => undefined);
+    apiP4.listDeadLettered().then(setDeadLetter).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -63,6 +65,22 @@ export function WebhooksPage() {
 
   const toggle = (t: string) =>
     setSelected((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
+
+  const redrive = useCallback(
+    async (id: string) => {
+      setBusy(true);
+      try {
+        await apiP4.redriveWebhook(id);
+        notify('Webhook redriven', 'success');
+        refresh();
+      } catch {
+        notify('Redrive failed', 'error');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, refresh],
+  );
 
   return (
     <div className="webhooks-page" data-testid="webhooks-page">
@@ -136,6 +154,42 @@ export function WebhooksPage() {
               </button>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="panel" data-testid="dead-letter-panel">
+        <header>
+          <h3>Dead-letter queue</h3>
+          <span className="count-pill">{deadLetter.length}</span>
+        </header>
+        <div className="body">
+          {deadLetter.length === 0 ? (
+            <div className="hint">
+              No dead-lettered webhooks. Endpoints that fail repeatedly land here
+              and stop receiving events until redriven.
+            </div>
+          ) : (
+            deadLetter.map((h) => (
+              <div className="webhook-row" key={h.id} data-testid="dead-letter-row">
+                <div className="webhook-info">
+                  <div className="webhook-url-text">{h.url}</div>
+                  <div className="webhook-meta">
+                    {h.failure_count} consecutive failures
+                    {h.attempts_log && h.attempts_log.length > 0 &&
+                      ` · last error: ${h.attempts_log[h.attempts_log.length - 1].error}`}
+                  </div>
+                </div>
+                <button
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => redrive(h.id)}
+                  data-testid="redrive-btn"
+                >
+                  Redrive
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

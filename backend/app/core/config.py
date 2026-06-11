@@ -94,6 +94,34 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
+    def validate_for_startup(self) -> list[str]:
+        """Return a list of configuration problems (empty == OK).
+
+        Enforces internal consistency so misconfiguration fails fast at startup
+        with a clear message rather than surfacing as confusing runtime errors.
+        """
+        problems: list[str] = []
+        if self.auth_enabled and not (self.api_key or self.jwt_secret):
+            problems.append(
+                "AUTH_ENABLED is true but neither API_KEY nor JWT_SECRET is set"
+            )
+        if self.rate_limit_enabled and self.rate_limit_per_minute <= 0:
+            problems.append("RATE_LIMIT_PER_MINUTE must be > 0 when rate limiting")
+        if not self.use_mocks:
+            # Live mode: require at least one real backend to be configured.
+            if not self.dynatrace_live and not self.gemini_live:
+                problems.append(
+                    "USE_MOCKS is false but no live backend is configured "
+                    "(set Dynatrace or Gemini credentials, or USE_MOCKS=true)"
+                )
+        if self.webhook_timeout_seconds <= 0:
+            problems.append("WEBHOOK_TIMEOUT_SECONDS must be > 0")
+        return problems
+
+
+class ConfigurationError(RuntimeError):
+    """Raised at startup when settings are internally inconsistent."""
+
 
 @lru_cache
 def get_settings() -> Settings:

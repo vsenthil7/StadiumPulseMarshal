@@ -56,8 +56,18 @@ class AppContext:
 
         self.incidents = IncidentService(
             self.repos.incidents, self.escalation, self.notifications,
-            events=self.events,
+            events=self.events, outbox=self.repos.outbox,
+            audit=None,  # set just below once audit service exists
         )
+        from app.services.audit_service import AuditService
+        from app.services.outbox_relay import OutboxRelay
+
+        self.audit = AuditService(self.repos.audit_log)
+        self.incidents._audit = self.audit  # inject now that it exists
+        self.relay = OutboxRelay(self.repos.outbox, self.events)
+        from app.services.idempotency import IdempotencyStore
+
+        self.idempotency = IdempotencyStore()
         self.slo_engine = SLOEngine(self._collect_slos())
         from app.services.slo_history import SLOHistory
 
@@ -102,9 +112,34 @@ class AppContext:
         return compute_summary(incidents, budgets)
 
     async def startup(self) -> None:
+        from app.core.config import ConfigurationError
+
+        problems = self.settings.validate_for_startup()
+        if problems:
+            raise ConfigurationError("; ".join(problems))
         await self.repos.init()
+        self.relay.start()
+
+    async def probe_readiness(self) -> dict:
+        """Actively probe dependencies for the readiness endpoint."""
+        checks: dict[str, str] = {}
+        try:
+            await self.client.list_problems(open_only=True)
+            checks["observability_client"] = f"ok ({self.client.mode})"
+        except Exception as exc:  # pragma: no cover - defensive
+            checks["observability_client"] = f"error: {exc}"
+        try:
+            await self.repos.incidents.count()
+            checks["persistence"] = (
+                "ok (sql)" if self.repos.database is not None else "ok (memory)"
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            checks["persistence"] = f"error: {exc}"
+        checks["agent"] = f"ok ({self.agent.backend})"
+        return checks
 
     async def shutdown(self) -> None:
+        await self.relay.stop()
         await self.client.close()
         await self.repos.dispose()
         await self._webhook_http.aclose()

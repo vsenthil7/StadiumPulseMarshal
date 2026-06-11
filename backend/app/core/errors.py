@@ -65,9 +65,10 @@ class RateLimitedError(AppError):
 
 
 def error_envelope(
-    code: str, message: str, request_id: str, details: dict[str, Any] | None = None
+    code: str, message: str, request_id: str, details: dict[str, Any] | None = None,
+    trace_id: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    env: dict[str, Any] = {
         "error": {
             "code": code,
             "message": message,
@@ -75,3 +76,6 @@ def error_envelope(
             "details": details or {},
         }
     }
+    if trace_id:
+        env["error"]["trace_id"] = trace_id
+    return env

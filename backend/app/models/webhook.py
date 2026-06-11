@@ -17,6 +17,16 @@ def new_webhook_id() -> str:
     return f"WH-{uuid.uuid4().hex[:8]}"
 
 
+class DeliveryAttempt(BaseModel):
+    """A single webhook delivery attempt record."""
+
+    attempt: int
+    at: datetime = Field(default_factory=_utcnow)
+    status_code: int | None = None
+    error: str = ""
+    success: bool = False
+
+
 class WebhookSubscription(BaseModel):
     """A registered webhook endpoint subscribed to event types."""
 
@@ -29,8 +39,12 @@ class WebhookSubscription(BaseModel):
     last_status: int | None = None
     last_delivery_at: datetime | None = None
     failure_count: int = 0
+    dead_lettered: bool = False
+    attempts_log: list[DeliveryAttempt] = Field(default_factory=list)
 
     def wants(self, event_type: EventType) -> bool:
-        return self.active and (
-            not self.event_types or event_type in self.event_types
+        return (
+            self.active
+            and not self.dead_lettered
+            and (not self.event_types or event_type in self.event_types)
         )

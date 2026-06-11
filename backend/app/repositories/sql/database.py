@@ -56,6 +56,24 @@ class BudgetRow(Base):
     document: Mapped[dict] = mapped_column(JSON)
 
 
+class OutboxRow(Base):
+    __tablename__ = "outbox"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class AuditLogRow(Base):
+    __tablename__ = "audit_log"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    resource_type: Mapped[str] = mapped_column(String, index=True)
+    resource_id: Mapped[str] = mapped_column(String, index=True)
+    actor: Mapped[str] = mapped_column(String, index=True)
+    action: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class Database:
     """Holds the engine + session factory and creates tables on init."""
 

@@ -271,3 +271,41 @@ are never throttled.
 ### Tracing
 Every response includes an `X-Request-ID`. Send your own to correlate across
 systems; it is echoed back and attached to logs and error envelopes.
+
+---
+
+## 14. Phase 4 — Audit log, dead-letter, safe operations
+
+### Audit tab
+Open the **Audit** tab to see a chronological log of every mutation (incident
+creation, transitions) with actor, action, resource and the before/after change.
+Filter by action and page through history with **Load more** (cursor-based, so
+it stays consistent even as new entries arrive).
+
+### Dead-letter queue (Webhooks tab)
+Webhook endpoints that fail repeatedly are retried with backoff and then moved
+to the **dead-letter queue**, where they stop receiving events until you click
+**Redrive** to re-activate them.
+
+### Safer operations (automatic)
+- **No duplicate incidents**: the console sends an idempotency key when opening
+  an incident, so a double-click or retry never creates two.
+- **No silent overwrites**: incident transitions are version-checked. If someone
+  else changed the incident first, you get a clear "conflict, refreshed" message
+  instead of clobbering their change.
+- **Resilient UI**: transient network blips are retried automatically; switching
+  views cancels in-flight requests; loading states show skeletons.
+
+---
+
+## 15. Operations reference (Phase 4)
+
+- **Tracing**: send a W3C `traceparent` header to correlate across systems; it
+  is continued and echoed back, and the trace id appears in error envelopes.
+- **Durable events**: domain events use a transactional outbox + relay, so they
+  survive a restart between commit and delivery (at-least-once).
+- **Readiness**: `GET /api/v1/ready` actively probes the observability client and
+  persistence; status is `ready` only when all checks pass, else `degraded`.
+- **Config self-check**: the service refuses to start on inconsistent config
+  (e.g. `AUTH_ENABLED=true` with no key/secret) with an explanatory message.
+- **Audit query**: `GET /api/v1/audit-log?resource_type=&actor=&action=&cursor=&limit=`.

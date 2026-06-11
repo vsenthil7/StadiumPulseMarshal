@@ -34,6 +34,8 @@ class RepositoryBundle:
     audit: AuditRepository
     notifications: NotificationRepository
     slo: SLORepository
+    outbox: object = None
+    audit_log: object = None
     # Optional SQL database handle (for lifecycle management).
     database: object | None = None
 
@@ -51,9 +53,11 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
     if settings.database_url:
         from app.repositories.sql.database import Database
         from app.repositories.sql.repositories import (
+            SQLAuditLogRepository,
             SQLAuditRepository,
             SQLIncidentRepository,
             SQLNotificationRepository,
+            SQLOutboxRepository,
             SQLRemediationRepository,
             SQLSLORepository,
         )
@@ -66,14 +70,23 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
             audit=SQLAuditRepository(db),
             notifications=SQLNotificationRepository(db),
             slo=SQLSLORepository(db),
+            outbox=SQLOutboxRepository(db),
+            audit_log=SQLAuditLogRepository(db),
             database=db,
         )
 
     log.info("Using in-memory persistence")
+    from app.repositories.memory.repositories import (
+        MemoryAuditLogRepository,
+        MemoryOutboxRepository,
+    )
+
     return RepositoryBundle(
         incidents=MemoryIncidentRepository(),
         remediations=MemoryRemediationRepository(),
         audit=MemoryAuditRepository(),
         notifications=MemoryNotificationRepository(),
         slo=MemorySLORepository(),
+        outbox=MemoryOutboxRepository(),
+        audit_log=MemoryAuditLogRepository(),
     )

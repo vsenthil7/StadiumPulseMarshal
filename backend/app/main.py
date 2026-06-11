@@ -15,6 +15,7 @@ from app.core.logging import get_logger
 from app.middleware.correlation import CorrelationIdMiddleware
 from app.middleware.errors import register_exception_handlers
 from app.middleware.metrics import RequestMetricsMiddleware
+from app.middleware.tracing import TraceContextMiddleware
 
 log = get_logger(__name__)
 
@@ -45,9 +46,10 @@ def create_app() -> FastAPI:
         description="AIOps matchday operations agent (Dynatrace MCP + Gemini).",
         lifespan=lifespan,
     )
-    # Middleware order: correlation id outermost, then metrics/timing.
+    # Middleware order: trace context outermost, then correlation, then metrics.
     app.add_middleware(RequestMetricsMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
+    app.add_middleware(TraceContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -65,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
 
     from app.api.routes_analysis import router as analysis_router
+    from app.api.routes_audit import router as audit_router
     from app.api.routes_incidents import router as incidents_router
     from app.api.routes_observability import router as obs_router
     from app.api.routes_ops import router as ops_router
@@ -75,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(obs_router)
     app.include_router(webhooks_router)
     app.include_router(analysis_router)
+    app.include_router(audit_router)
 
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:

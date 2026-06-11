@@ -64,3 +64,25 @@ async def delete_webhook(
     ctx = _ctx(request)
     if not ctx.webhooks.delete(webhook_id):
         raise NotFoundError("Webhook not found")
+
+
+@router.get("/dead-letter/list", response_model=WebhookListResponse)
+async def list_dead_lettered(
+    request: Request,
+    _p=Depends(require_permission(Permission.WEBHOOK_ADMIN)),
+) -> WebhookListResponse:
+    ctx = _ctx(request)
+    return WebhookListResponse(webhooks=ctx.webhooks.list_dead_lettered())
+
+
+@router.post("/{webhook_id}/redrive", response_model=WebhookResponse)
+async def redrive_webhook(
+    request: Request,
+    webhook_id: str,
+    _p=Depends(require_permission(Permission.WEBHOOK_ADMIN)),
+) -> WebhookResponse:
+    ctx = _ctx(request)
+    sub = await ctx.webhook_dispatcher.redrive(webhook_id)
+    if sub is None:
+        raise NotFoundError("Webhook not found")
+    return WebhookResponse(webhook=sub)
