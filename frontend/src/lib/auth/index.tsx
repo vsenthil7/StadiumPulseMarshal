@@ -66,8 +66,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clear]);
 
-  // On mount: if we restored a live session, verify/rehydrate it via /auth/me.
+  // On mount: handle an OIDC callback token in the URL fragment, else if we
+  // restored a live session verify/rehydrate it via /auth/me.
   useEffect(() => {
+    const hash = window.location.hash;
+    const m = hash.match(/oidc_token=([^&]+)/);
+    if (m) {
+      const token = decodeURIComponent(m[1]);
+      // Clean the fragment so the token doesn't linger in the URL.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      liveMe(token).then((fresh) => {
+        if (fresh) commit({ ...fresh, token });
+      });
+      return;
+    }
     const restored = session;
     if (restored?.source === 'live' && restored.token) {
       liveMe(restored.token).then((fresh) => {

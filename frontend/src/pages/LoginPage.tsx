@@ -2,15 +2,21 @@
 // auth offline. Quick-fill chips cover the role × 2-venue matrix so any persona
 // is one click away. Mirrors the SpoofVane login, adapted to matchday venues
 // and this app's four roles.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { DEMO_PASSWORD, DEMO_USERS } from '../lib/demo-users';
+import { systemApi } from '../api/client';
 
 export function LoginPage() {
   const { login, loading, source } = useAuth();
   const [email, setEmail] = useState('operator@arena-north.demo');
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
+  const [ssoEnabled, setSsoEnabled] = useState(false);
+
+  useEffect(() => {
+    systemApi.oidcStatus().then((s) => setSsoEnabled(s.enabled)).catch(() => setSsoEnabled(false));
+  }, []);
 
   const grouped = useMemo(() => {
     const g: Record<string, typeof DEMO_USERS> = {};
@@ -73,6 +79,16 @@ export function LoginPage() {
           <button className="btn-primary login-submit" data-testid="login-submit" onClick={submit} disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          {ssoEnabled && (
+            <a
+              className="btn-sso"
+              data-testid="login-sso"
+              href="/api/v1/auth/oidc/login?return_to=/"
+            >
+              Sign in with SSO
+            </a>
+          )}
 
           <div className="login-demo">
             <div className="login-demo-head">Demo accounts · password {DEMO_PASSWORD}</div>

@@ -7,40 +7,18 @@ import type {
   RemediationAction,
   TimelineEntry,
 } from '../types';
+import { http } from './core';
 
-const BASE = '/api/v1';
-
-// Bearer token set by the auth context (lib/auth.tsx). When present it is sent
-// on every request so the backend can resolve a Principal from the JWT.
-let _authToken: string | null = null;
-export function setAuthToken(token: string | null): void {
-  _authToken = token;
-}
-export function getAuthToken(): string | null {
-  return _authToken;
-}
-
-// Session-expiry hook (shared concept with http.ts). The auth context registers
-// a callback so any 401 clears the session and returns to the login gate.
-let _onUnauthorized: (() => void) | null = null;
-export function setClientUnauthorizedHandler(fn: (() => void) | null): void {
-  _onUnauthorized = fn;
-}
-
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(_authToken ? { Authorization: `Bearer ${_authToken}` } : {}),
-    },
-    ...init,
-  });
-  if (!res.ok) {
-    if (res.status === 401 && _onUnauthorized) _onUnauthorized();
-    throw new Error(`API ${res.status}: ${path}`);
-  }
-  return (await res.json()) as T;
-}
+// Barrel: re-export shared core + grouped modules so existing imports from
+// '../api/client' keep working unchanged.
+export {
+  setAuthToken,
+  getAuthToken,
+  setClientUnauthorizedHandler,
+  newIdempotencyKey,
+} from './core';
+export { systemApi } from './system';
+export type { HealthInfo, ReadyInfo } from './system';
 
 export const api = {
   getConfig: () => http<AppConfig>('/config'),
@@ -273,23 +251,4 @@ export const apiP4 = {
     request<{ webhook: WHSub }>(`/webhooks/${id}/redrive`, {
       method: 'POST',
     }).then((r) => r.webhook),
-};
-
-// Small helper to generate idempotency keys client-side.
-export function newIdempotencyKey(): string {
-  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-// ── Health surface (system endpoints) ──────────────────────────────────────
-export interface HealthInfo { status: string; version?: string }
-export interface ReadyInfo { status: string; checks: Record<string, string> }
-
-export const systemApi = {
-  health: () => http<HealthInfo>('/health'),
-  ready: () => http<ReadyInfo>('/ready'),
-  config: () => http<import('../types').AppConfig>('/config'),
-  venues: () =>
-    http<{ venues: { id: string; name: string; city: string; capacity: number }[]; all_venues: boolean }>(
-      '/venues',
-    ),
 };

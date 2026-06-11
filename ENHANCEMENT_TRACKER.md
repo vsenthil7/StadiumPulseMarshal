@@ -132,3 +132,48 @@ frontend, modularised (no single-file dumping).
   **403**; responder approve **200**.
 
 ### Round 2 — COMPLETE
+
+---
+
+## Round 3 — Depth: full venue enforcement, OIDC, modularise the rest
+
+Continuation per review. Scope not shrunk.
+
+### Sprints
+| # | Sprint | Status |
+|---|--------|--------|
+| S1 | Audit every venue-bearing route; extend require_venue_access everywhere | 🟢 |
+| S2 | Incident sub-routes (get/transition/assign/note) enforce venue on the entity | 🟢 |
+| S3 | Tests for per-entity venue enforcement (cross-venue 403 on detail/actions) | 🟢 |
+| S4 | OIDC: discovery + authorization-code login module (backend) | 🟢 |
+| S5 | OIDC: token exchange → Principal (role+venue mapping) + tests | 🟢 |
+| S6 | Frontend: OIDC sign-in button + callback handling (graceful if unconfigured) | 🟢 |
+| S7 | Modularise TriagePage (322L) into sub-panels | 🟢 |
+| S8 | Modularise client.ts (295L) into api/ modules | 🟢 |
+| S9 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| S10 | Docs + package | 🟢 |
+
+### Round 3 changelog
+- **S1–S3 (full venue enforcement):** added `_authorize_incident` — every
+  incident sub-route (get / transition / assign / note / escalate) now loads the
+  entity and enforces the principal's venue scope, not just the list filter.
+  +3 tests prove cross-venue 403 on each sub-route (and same-venue 200).
+- **S4–S5 (OIDC):** new `app/services/oidc_service.py` (discovery, signed-state
+  CSRF, code exchange, claims→Principal role+venue mapping, app-JWT minting) +
+  `/api/v1/auth/oidc/{status,login,callback}`. Degrades gracefully when
+  unconfigured (status=false, login 401). OIDC settings added to config.
+  +10 tests (state tamper, role/venue mapping, admin defaults, status endpoint).
+- **S6 (frontend OIDC):** Login page shows an SSO button only when
+  `/auth/oidc/status` is enabled; the auth provider captures the `#oidc_token=`
+  callback fragment and rehydrates via `/auth/me`.
+- **S7 (modularise TriagePage):** 322 → 141 lines. Extracted `useTriage` hook
+  (state + IO) and `components/triage/{ProblemFeed,DecisionAuditLog}`.
+- **S8 (modularise client.ts):** 295 → 254 lines; shared core extracted to
+  `api/core.ts` (http, token, 401 handler, idempotency key) and `api/system.ts`
+  (health/ready/config/venues/oidc). `client.ts` is now a barrel.
+- **S9:** backend **245 tests pass**; frontend `tsc -b` + `vite build` green; 7
+  node RBAC unit tests pass. Live-verified: OIDC status, per-entity cross-venue
+  403 on read + write.
+- **S10:** docs + package.
+
+### Round 3 — COMPLETE

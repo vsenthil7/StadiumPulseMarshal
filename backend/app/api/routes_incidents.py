@@ -24,6 +24,22 @@ def _ctx(request: Request) -> AppContext:
     return request.app.state.ctx
 
 
+async def _authorize_incident(
+    request: Request, incident_id: str, principal: Principal
+):
+    """Load an incident or 404, then enforce the principal's venue scope on it.
+
+    Prevents acting on another venue's incident by id — defence at the entity
+    level, not just on the list filter.
+    """
+    ctx = _ctx(request)
+    incident = await ctx.incidents.get(incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    require_venue_access(principal, incident.venue_id)
+    return incident
+
+
 @router.get("", response_model=IncidentListResponse)
 async def list_incidents(
     request: Request,
@@ -79,12 +95,9 @@ async def create_incident(
 @router.get("/{incident_id}", response_model=IncidentResponse)
 async def get_incident(
     request: Request, incident_id: str,
-    _p=Depends(require_permission(Permission.INCIDENT_READ)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> IncidentResponse:
-    ctx = _ctx(request)
-    incident = await ctx.incidents.get(incident_id)
-    if incident is None:
-        raise HTTPException(status_code=404, detail="Incident not found")
+    incident = await _authorize_incident(request, incident_id, principal)
     return IncidentResponse(incident=incident)
 
 
@@ -93,9 +106,10 @@ async def transition_incident(
     request: Request,
     incident_id: str,
     body: TransitionRequest,
-    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    await _authorize_incident(request, incident_id, principal)
     try:
         incident = await ctx.incidents.transition(
             incident_id, body.target, actor=body.actor, note=body.note,
@@ -116,9 +130,10 @@ async def assign_incident(
     request: Request,
     incident_id: str,
     body: AssignRequest,
-    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    await _authorize_incident(request, incident_id, principal)
     try:
         incident = await ctx.incidents.assign(
             incident_id, body.assignee, actor=body.actor
@@ -133,9 +148,10 @@ async def add_note(
     request: Request,
     incident_id: str,
     body: NoteRequest,
-    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    await _authorize_incident(request, incident_id, principal)
     try:
         incident = await ctx.incidents.add_note(
             incident_id, body.note, actor=body.actor
@@ -147,9 +163,11 @@ async def add_note(
 
 @router.post("/{incident_id}/escalate", response_model=IncidentResponse)
 async def escalate_incident(
-    request: Request, incident_id: str, _p=Depends(require_permission(Permission.INCIDENT_WRITE))
+    request: Request, incident_id: str,
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    await _authorize_incident(request, incident_id, principal)
     try:
         incident = await ctx.incidents.evaluate_escalation(incident_id)
     except IncidentError as exc:

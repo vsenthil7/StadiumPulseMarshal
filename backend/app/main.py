@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
 
     from app.api.routes_analysis import router as analysis_router
     from app.api.routes_audit import router as audit_router
+    from app.api.routes_auth import oidc_router
     from app.api.routes_auth import router as auth_router
     from app.api.routes_incidents import router as incidents_router
     from app.api.routes_observability import router as obs_router
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(audit_router)
     app.include_router(auth_router)
+    app.include_router(oidc_router)
     app.include_router(venues_router)
 
     @app.websocket("/api/v1/stream")

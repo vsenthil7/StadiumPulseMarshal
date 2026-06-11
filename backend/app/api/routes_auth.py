@@ -135,3 +135,57 @@ async def demo_users() -> dict:
             for e, u in DEMO_USERS.items()
         ],
     }
+
+
+# ── OIDC SSO (optional) ──────────────────────────────────────────────────────
+from fastapi.responses import RedirectResponse  # noqa: E402
+
+from app.services.oidc_service import OIDCError, OIDCService  # noqa: E402
+
+oidc_router = APIRouter(prefix="/api/v1/auth/oidc", tags=["auth"])
+
+
+def _oidc(request: Request) -> OIDCService:
+    # Cache one service on app state.
+    svc = getattr(request.app.state, "_oidc", None)
+    if svc is None:
+        svc = OIDCService(request.app.state.ctx.settings)
+        request.app.state._oidc = svc
+    return svc
+
+
+@oidc_router.get("/status")
+async def oidc_status(request: Request) -> dict:
+    """Whether SSO is available — lets the SPA show/hide the SSO button."""
+    return {"enabled": _oidc(request).enabled}
+
+
+@oidc_router.get("/login")
+async def oidc_login(request: Request, return_to: str = "/"):
+    svc = _oidc(request)
+    if not svc.enabled:
+        raise UnauthorizedError("OIDC is not configured")
+    try:
+        url = await svc.authorization_url(return_to)
+    except OIDCError as exc:
+        raise UnauthorizedError(str(exc)) from exc
+    return RedirectResponse(url, status_code=307)
+
+
+@oidc_router.get("/callback")
+async def oidc_callback(request: Request, code: str | None = None, state: str | None = None):
+    svc = _oidc(request)
+    if not svc.enabled:
+        raise UnauthorizedError("OIDC is not configured")
+    if not code or not state:
+        raise UnauthorizedError("Missing code/state")
+    data = svc.verify_state(state)
+    try:
+        identity = await svc.exchange_code(code)
+    except OIDCError as exc:
+        raise UnauthorizedError(str(exc)) from exc
+    token = svc.mint_session_jwt(identity)
+    # Hand the SPA its session token via the redirect fragment (not query, so it
+    # never lands in server logs), then the SPA stores it like any login.
+    return_to = data.get("r", "/")
+    return RedirectResponse(f"{return_to}#oidc_token={token}", status_code=307)

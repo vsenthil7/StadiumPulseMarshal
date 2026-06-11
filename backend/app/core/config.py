@@ -65,6 +65,24 @@ class Settings(BaseSettings):
     # JWT claim that carries a list (or comma string) of role names.
     jwt_roles_claim: str = Field(default="roles")
 
+    # --- OIDC (optional; enables enterprise SSO sign-in) ---
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_redirect_uri: str | None = None
+    # Where in the ID-token claims to find roles and venue scope.
+    oidc_roles_claim: str = Field(default="roles")
+    oidc_venues_claim: str = Field(default="venues")
+    oidc_scopes: str = Field(default="openid profile email")
+
+    @property
+    def oidc_enabled(self) -> bool:
+        return bool(self.oidc_issuer and self.oidc_client_id and self.oidc_redirect_uri)
+
+    @property
+    def oidc_scope_list(self) -> list[str]:
+        return [s.strip() for s in self.oidc_scopes.split() if s.strip()]
+
     @property
     def api_key_role_list(self) -> list[str]:
         return [r.strip() for r in self.api_key_roles.split(",") if r.strip()]

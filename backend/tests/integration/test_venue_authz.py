@@ -106,3 +106,58 @@ def test_platform_admin_any_venue():
         h = {"Authorization": f"Bearer {sre}"}
         assert c.get("/api/v1/incidents?venue_id=venue_olympic_park", headers=h).status_code == 200
         assert c.get("/api/v1/incidents?venue_id=venue_arena_north", headers=h).status_code == 200
+
+
+def _create_incident_in(c: TestClient, token: str, venue_id: str) -> str:
+    h = {"Authorization": f"Bearer {token}"}
+    problems = c.get("/api/v1/problems?open_only=true", headers=h).json()["problems"]
+    pid = problems[0]["id"]
+    r = c.post("/api/v1/incidents",
+               json={"problem_id": pid, "venue_id": venue_id}, headers=h)
+    assert r.status_code == 201, r.text
+    return r.json()["incident"]["id"]
+
+
+def test_per_entity_venue_enforcement():
+    """An operator may not act on another venue's incident by id."""
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]  # cross-venue
+        # incident lives in Olympic Park
+        iid = _create_incident_in(c, sre, "venue_olympic_park")
+
+        # Arena North operator must be 403 on every sub-route for it.
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        assert c.get(f"/api/v1/incidents/{iid}", headers=h).status_code == 403
+        assert c.post(f"/api/v1/incidents/{iid}/transition",
+                      json={"target": "ACKNOWLEDGED", "actor": "op"},
+                      headers=h).status_code == 403
+        assert c.post(f"/api/v1/incidents/{iid}/assign",
+                      json={"assignee": "x", "actor": "op"},
+                      headers=h).status_code == 403
+        assert c.post(f"/api/v1/incidents/{iid}/note",
+                      json={"note": "x", "actor": "op"},
+                      headers=h).status_code == 403
+        assert c.post(f"/api/v1/incidents/{iid}/escalate",
+                      headers=h).status_code == 403
+
+
+def test_per_entity_same_venue_allowed():
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        iid = _create_incident_in(c, sre, "venue_arena_north")
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        # same venue: read + act allowed
+        assert c.get(f"/api/v1/incidents/{iid}", headers=h).status_code == 200
+        assert c.post(f"/api/v1/incidents/{iid}/note",
+                      json={"note": "looking", "actor": "op"},
+                      headers=h).status_code == 200
+
+
+def test_platform_admin_acts_any_venue_entity():
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        h = {"Authorization": f"Bearer {sre}"}
+        iid = _create_incident_in(c, sre, "venue_olympic_park")
+        assert c.get(f"/api/v1/incidents/{iid}", headers=h).status_code == 200

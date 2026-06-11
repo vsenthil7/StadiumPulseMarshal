@@ -132,3 +132,53 @@ login gate instead of failing silently.
   `/venues` scoping).
 - Frontend **7 runnable RBAC unit tests** (`node --test src/lib/rbac.test.ts`).
 - e2e extended with permission-gating assertions (run in CI).
+
+---
+
+## Round 3 — Full venue enforcement, OIDC SSO, deeper modularisation
+
+### Per-entity venue authorization (closes the by-id loophole)
+Round 2 enforced venue scope on the incident *list filter*. A reviewer would
+note that an operator could still act on another venue's incident by hitting
+`/incidents/{id}` directly. Round 3 closes this: every incident sub-route
+(`GET /{id}`, `transition`, `assign`, `note`, `escalate`) loads the entity and
+runs `require_venue_access(principal, incident.venue_id)` before acting. Proven
+by tests and live — an Arena North operator gets **403** on an Olympic Park
+incident for both read and write; a platform (cross-venue) principal is allowed.
+
+### OIDC single sign-on (enterprise SSO)
+New `app/services/oidc_service.py` implements an authorization-code flow:
+provider discovery, signed-state CSRF protection, code→token exchange, and
+mapping of ID-token claims to the app's role + venue scope. It mints the app's
+own session JWT so an SSO login produces an identical `Principal` to the demo
+password flow. Endpoints: `GET /api/v1/auth/oidc/{status,login,callback}`.
+
+It is **off by default and degrades gracefully** — when `OIDC_ISSUER` /
+`OIDC_CLIENT_ID` / `OIDC_REDIRECT_URI` are unset, `status` returns
+`{"enabled": false}`, `login` returns 401, and the SPA simply doesn't show the
+SSO button. Configure via env:
+
+```
+OIDC_ISSUER=https://your-idp.example.com
+OIDC_CLIENT_ID=stadiumpulse
+OIDC_CLIENT_SECRET=…
+OIDC_REDIRECT_URI=https://your-app/api/v1/auth/oidc/callback
+OIDC_ROLES_CLAIM=roles      # default
+OIDC_VENUES_CLAIM=venues    # default
+```
+
+The frontend shows a "Sign in with SSO" button when enabled and captures the
+returned token from the callback fragment, then rehydrates via `/auth/me`.
+
+### Deeper modularisation
+- `TriagePage` 322 → 141 lines: data + IO moved to a `useTriage` hook; the feed
+  and decision-audit regions are now `components/triage/ProblemFeed` and
+  `DecisionAuditLog`.
+- `client.ts` 295 → 254 lines: shared HTTP core extracted to `api/core.ts`
+  (base URL, bearer token, 401 handling, idempotency key) and system endpoints
+  to `api/system.ts`; `client.ts` is now a barrel that re-exports them.
+
+### Tests
+- Backend **245 pass** (+13 this round: venue per-entity enforcement + OIDC).
+- Frontend `tsc -b` + `vite build` green; 7 runnable RBAC unit tests pass.
+- Live-verified: OIDC `status`, per-entity cross-venue **403** on read + write.
