@@ -716,3 +716,5 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
 .status-ok { background: rgba(40,160,80,0.15); color: var(--ok, #2a8); }
 .status-fail { background: rgba(200,60,60,0.15); color: var(--err, #c44); }
+.text-input { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
+  border-radius: 6px; padding: 6px 10px; font-size: 13px; }

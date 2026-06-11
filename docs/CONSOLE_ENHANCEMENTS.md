@@ -816,3 +816,27 @@ rows.
 
 ### Tests
 Backend **431 pass** (+9 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 25 — Per-venue webhooks, scheduler status, mute audit, test-webhook
+
+### Per-venue webhook URLs
+`BURN_DIGEST_VENUE_WEBHOOKS` maps venue → URL; venue-scoped dispatch and the
+fan-out scheduler post to the venue's own endpoint, falling back to the global
+`BURN_DIGEST_WEBHOOK_URL`.
+
+### Scheduler status
+All digest schedulers track last run / status / run count / next run; `GET
+/ops/schedulers` (admin) returns them, surfaced as a panel on the On-call page.
+
+### Mute audit history
+`GET /slo/burn-digest/mute-events` returns the digest mute/unmute audit trail;
+the On-call page shows a mute-history panel.
+
+### Test webhook
+`POST /ops/test-webhook` (admin) posts a sample payload to a URL to verify
+connectivity; the On-call page has a URL field and Send-test button.
+
+### Tests
+Backend **439 pass** (+8 this round). Frontend `tsc -b` + `vite build` green.

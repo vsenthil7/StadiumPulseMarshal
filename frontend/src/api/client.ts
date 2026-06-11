@@ -213,6 +213,18 @@ export const apiExt = {
     http<{ id: string; status: string; delivered: boolean }>(
       `/notifications/${encodeURIComponent(id)}/resend`, { method: 'POST' },
     ),
+  getSchedulers: () =>
+    http<{ schedulers: { name: string; running: boolean; last_run_epoch?: number | null; last_status?: string; runs?: number; next_run_epoch?: number | null }[] }>(
+      '/ops/schedulers',
+    ).then((r) => r.schedulers),
+  getMuteEvents: () =>
+    http<{ events: { id: string; at: string; actor: string; action: string; venue_id: string }[]; total: number }>(
+      '/slo/burn-digest/mute-events',
+    ),
+  testWebhook: (url: string) =>
+    http<{ url: string; delivered: boolean }>('/ops/test-webhook', {
+      method: 'POST', body: JSON.stringify({ url }),
+    }),
   getScenarios: () =>
     http<{ scenarios: ScenarioInfo[]; active: string }>('/scenarios'),
   selectScenario: (key: string) =>

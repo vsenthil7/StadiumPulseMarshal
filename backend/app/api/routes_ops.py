@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.api.auth import require_permission, require_venue_access
 from app.rbac.policy import Permission, Principal
@@ -108,6 +109,51 @@ async def list_notifications(
             if getattr(n.status, "value", n.status) == status
         ]
     return NotificationListResponse(notifications=notifications)
+
+
+@router.get("/ops/schedulers", tags=["ops"])
+async def ops_schedulers(
+    request: Request,
+    _p: Principal = Depends(require_permission(Permission.SETTINGS_WRITE)),
+) -> dict:
+    """Status of background schedulers (admin): running, last run, next run."""
+    ctx = _ctx(request)
+    out = []
+    for attr in ("prune_scheduler", "digest_scheduler",
+                 "daily_digest_scheduler", "venue_fanout_scheduler"):
+        sched = getattr(ctx, attr, None)
+        if sched is None:
+            continue
+        if hasattr(sched, "status"):
+            out.append(sched.status())
+        else:
+            running = getattr(sched, "_task", None) is not None \
+                and not sched._task.done()
+            out.append({"name": attr, "running": running})
+    return {"schedulers": out}
+
+
+class _TestWebhookBody(BaseModel):
+    url: str
+
+
+@router.post("/ops/test-webhook", tags=["ops"])
+async def ops_test_webhook(
+    body: _TestWebhookBody, request: Request,
+    _p: Principal = Depends(require_permission(Permission.WEBHOOK_ADMIN)),
+) -> dict:
+    """POST a sample payload to a URL to verify connectivity (admin)."""
+    ctx = _ctx(request)
+    payload = {"text": "StadiumPulse test webhook", "source": "test",
+               "at": _now_iso()}
+    delivered = await ctx.webhook_dispatcher.post_message(body.url, payload)
+    return {"url": body.url, "delivered": delivered}
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 @router.post("/notifications/{notification_id}/resend", tags=["incidents"])

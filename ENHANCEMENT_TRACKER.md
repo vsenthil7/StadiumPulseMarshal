@@ -1302,3 +1302,61 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **CK2:** docs + package.
 
 ### Round 24 — COMPLETE
+
+---
+
+## Round 25 — Per-venue webhook URLs, scheduler status panel, mute audit, test-webhook
+
+### Track CL — per-venue webhook URLs
+| # | Sprint | Status |
+|---|--------|--------|
+| CL1 | Config BURN_DIGEST_VENUE_WEBHOOKS=venue=url,...; map property | 🟢 |
+| CL2 | venue dispatch + fan-out + resend use per-venue URL (fallback global) | 🟢 |
+| CL3 | Tests: per-venue URL chosen; fallback when unmapped | 🟢 |
+
+### Track CM — scheduler status panel
+| # | Sprint | Status |
+|---|--------|--------|
+| CM1 | Schedulers track last_run/last_status/next_run; status() method | 🟢 |
+| CM2 | GET /ops/schedulers returns each scheduler's status (admin) | 🟢 |
+| CM3 | Frontend: scheduler status panel on On-call page | 🟢 |
+| CM4 | Tests: status reflects run; endpoint RBAC | 🟢 |
+
+### Track CN — mute audit history
+| # | Sprint | Status |
+|---|--------|--------|
+| CN1 | /slo/burn-digest/mute-events: digest.mute/unmute audit history | 🟢 |
+| CN2 | Frontend: mute history on On-call (or surface in venue panel) | 🟢 |
+| CN3 | Tests: history returns mute/unmute; RBAC | 🟢 |
+
+### Track CO — test-webhook
+| # | Sprint | Status |
+|---|--------|--------|
+| CO1 | POST /ops/test-webhook posts a sample payload to a URL (admin) | 🟢 |
+| CO2 | Returns delivered + status; uses dispatcher.post_message | 🟢 |
+| CO3 | Frontend: Test webhook button | 🟢 |
+| CO4 | Tests: success + failure (MockTransport) | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| CP1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| CP2 | Docs + package | 🟢 |
+
+### Round 25 changelog
+- **CL — per-venue webhook URLs:** BURN_DIGEST_VENUE_WEBHOOKS map +
+  webhook_url_for_venue(venue) (per-venue, else global); venue dispatch + fan-out
+  use it. +tests. Live-verified resolution + fallback.
+- **CM — scheduler status:** SchedulerStats mixin (last_run/last_status/runs/
+  next_run) on all digest schedulers; GET /ops/schedulers (admin). On-call panel
+  shows status. +tests. Live-verified.
+- **CN — mute audit:** GET /slo/burn-digest/mute-events (digest.mute/unmute
+  history); On-call mute-history panel. +test. Live-verified mute+unmute recorded.
+- **CO — test-webhook:** POST /ops/test-webhook posts a sample payload (admin),
+  returns delivered; On-call Test-webhook input+button. +tests (200/500 via
+  MockTransport). Live-verified.
+- **CP1a:** interval schedulers now record their real next-wake timestamp (set before each sleep); /ops/schedulers shows the true next run, not an estimate. +test.
+- **CP1:** backend **440 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **CP2:** docs + package.
+
+### Round 25 — COMPLETE

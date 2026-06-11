@@ -111,8 +111,43 @@ def next_run_delay(hh_mm: str, now_epoch: float | None = None,
     return float(delay)
 
 
-class DailyAtScheduler:
+class SchedulerStats:
+    """Mixin: lightweight run bookkeeping shared by the digest schedulers."""
+
+    name: str = "scheduler"
+
+    def _init_stats(self) -> None:
+        self._last_run: float | None = None
+        self._last_status: str = "idle"
+        self._runs: int = 0
+        self._next_wake: float | None = None
+
+    def _record_run(self, ok: bool) -> None:
+        import time as _t
+
+        self._last_run = _t.time()
+        self._last_status = "ok" if ok else "error"
+        self._runs += 1
+
+    def next_run_epoch(self) -> float | None:
+        return None  # overridden where a deterministic next time exists
+
+    def status(self) -> dict:
+        running = getattr(self, "_task", None) is not None and not self._task.done()
+        return {
+            "name": self.name,
+            "running": running,
+            "last_run_epoch": getattr(self, "_last_run", None),
+            "last_status": getattr(self, "_last_status", "idle"),
+            "runs": getattr(self, "_runs", 0),
+            "next_run_epoch": self.next_run_epoch(),
+        }
+
+
+class DailyAtScheduler(SchedulerStats):
     """Runs a composer+dispatch once per day at a wall-clock ``HH:MM``."""
+
+    name = "daily_digest"
 
     def __init__(self, ctx, at: str, composer, dispatch, tz: str | None = None) -> None:
         self._ctx = ctx
@@ -121,6 +156,12 @@ class DailyAtScheduler:
         self._dispatch = dispatch
         self._tz = tz
         self._task = None
+        self._init_stats()
+
+    def next_run_epoch(self) -> float | None:
+        import time as _t
+
+        return _t.time() + next_run_delay(self._at, tz=self._tz)
 
     def start(self) -> None:
         if self._task is not None and not self._task.done():
@@ -146,9 +187,11 @@ class DailyAtScheduler:
                     await self._dispatch(msg)
                 else:
                     log.info("Daily burn digest:\n%s", msg)
+                self._record_run(True)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
+                self._record_run(False)
                 log.warning("daily digest cycle failed: %s", exc)
 
 
@@ -193,8 +236,10 @@ async def compose_digest(ctx, window_hours: float = 24.0,
     return "\n".join(lines)
 
 
-class DigestScheduler:
+class DigestScheduler(SchedulerStats):
     """Periodically composes and dispatches the digest. Idempotent start/stop."""
+
+    name = "hourly_digest"
 
     def __init__(self, ctx, interval_seconds: float,
                  dispatch: Callable[[str], Awaitable[None]] | None = None,
@@ -207,6 +252,14 @@ class DigestScheduler:
         self._min_severity = min_severity
         self._composer = composer
         self._task: asyncio.Task | None = None
+        self._init_stats()
+
+    def next_run_epoch(self) -> float | None:
+        import time as _t
+
+        # Real next-wake once the loop is sleeping; estimate before first sleep.
+        return self._next_wake if self._next_wake is not None \
+            else _t.time() + self._interval
 
     def start(self) -> None:
         if self._task is not None and not self._task.done():
@@ -226,6 +279,8 @@ class DigestScheduler:
     async def _run(self) -> None:
         while True:
             try:
+                import time as _t
+                self._next_wake = _t.time() + self._interval
                 await asyncio.sleep(self._interval)
                 if self._composer is not None:
                     msg = await self._composer(self._ctx)
@@ -236,19 +291,23 @@ class DigestScheduler:
                     await self._dispatch(msg)
                 else:
                     log.info("Burn digest:\n%s", msg)
+                self._record_run(True)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - never let the loop die
+                self._record_run(False)
                 log.warning("digest cycle failed: %s", exc)
 
 
-class VenueFanoutScheduler:
+class VenueFanoutScheduler(SchedulerStats):
     """Periodically composes a per-venue digest for each mapped venue and
     dispatches it to that venue's channel, skipping muted venues.
 
     ``venue_channels`` maps venue_id → recipient; ``dispatch`` receives
     (venue_id, recipient, message). Idempotent start/stop like the others.
     """
+
+    name = "venue_fanout"
 
     def __init__(self, ctx, interval_seconds: float, venue_channels: dict,
                  dispatch, mute_store=None) -> None:
@@ -258,6 +317,14 @@ class VenueFanoutScheduler:
         self._dispatch = dispatch
         self._mute_store = mute_store
         self._task = None
+        self._init_stats()
+
+    def next_run_epoch(self) -> float | None:
+        import time as _t
+
+        # Real next-wake once the loop is sleeping; estimate before first sleep.
+        return self._next_wake if self._next_wake is not None \
+            else _t.time() + self._interval
 
     def start(self) -> None:
         if self._task is not None and not self._task.done():
@@ -289,9 +356,13 @@ class VenueFanoutScheduler:
     async def _run(self) -> None:
         while True:
             try:
+                import time as _t
+                self._next_wake = _t.time() + self._interval
                 await asyncio.sleep(self._interval)
                 await self.run_once()
+                self._record_run(True)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
+                self._record_run(False)
                 log.warning("venue fan-out cycle failed: %s", exc)

@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     burn_digest_venue_channels: str = Field(default="")
     burn_digest_venue_fanout_enabled: bool = Field(default=False)
     burn_digest_venue_fanout_interval_seconds: float = Field(default=3600.0)
+    # Per-venue webhook URLs, e.g. "venue_arena_north=https://hooks/...,..."
+    burn_digest_venue_webhooks: str = Field(default="")
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.
@@ -185,6 +187,24 @@ class Settings(BaseSettings):
                 k, v = pair.split("=", 1)
                 out[k.strip()] = v.strip()
         return out
+
+    @property
+    def burn_digest_venue_webhook_map(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.burn_digest_venue_webhooks.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    def webhook_url_for_venue(self, venue_id: str | None) -> str | None:
+        """Per-venue webhook URL if mapped, else the global digest URL."""
+        if venue_id is not None:
+            url = self.burn_digest_venue_webhook_map.get(venue_id)
+            if url:
+                return url
+        return self.burn_digest_webhook_url
 
     @property
     def oidc_enabled(self) -> bool:

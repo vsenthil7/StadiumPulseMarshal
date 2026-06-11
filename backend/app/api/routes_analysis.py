@@ -86,6 +86,23 @@ async def slo_burn_events(
     return {"events": page, "total": total, "offset": offset, "limit": limit}
 
 
+@router.get("/slo/burn-digest/mute-events", tags=["slo"])
+async def slo_mute_events(
+    request: Request, limit: int = 50,
+    _p: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Digest mute/unmute audit history (newest first)."""
+    ctx = _ctx(request)
+    entries = await ctx.audit.query(resource_type="venue_digest", limit=10_000)
+    rows = [
+        {"id": e.id, "at": e.at.isoformat(), "actor": e.actor,
+         "action": e.action.replace("digest.", ""), "venue_id": e.resource_id}
+        for e in entries
+    ]
+    rows.sort(key=lambda r: r["at"], reverse=True)
+    return {"events": rows[:limit], "total": len(rows)}
+
+
 class _MuteBody(BaseModel):
     venue_id: str
     minutes: float = 60.0
@@ -173,7 +190,7 @@ async def slo_burn_digest(
                 venue_id, recipient)
         await ctx.notifications.notify_digest(
             msg, channel=ch, recipient=recipient,
-            webhook_url=ctx.settings.burn_digest_webhook_url,
+            webhook_url=ctx.settings.webhook_url_for_venue(venue_id),
             webhook_poster=ctx.webhook_dispatcher.post_message,
         )
         sent = True

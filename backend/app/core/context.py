@@ -443,7 +443,7 @@ class AppContext:
             async def _dispatch_venue(venue_id: str, recipient: str, msg: str) -> None:
                 await self.notifications.notify_digest(
                     msg, channel=fch, recipient=recipient,
-                    webhook_url=self.settings.burn_digest_webhook_url,
+                    webhook_url=self.settings.webhook_url_for_venue(venue_id),
                     webhook_poster=self.webhook_dispatcher.post_message)
 
             self.venue_fanout_scheduler = VenueFanoutScheduler(

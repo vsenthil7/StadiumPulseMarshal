@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiExt } from '../api/client';
 import { SuppressionTrend } from '../components/SuppressionTrend';
 import { BurnByVenueChart } from '../components/BurnByVenueChart';
+import { useAuth } from '../lib/auth';
+import { roleMeets } from '../lib/rbac';
 
 interface OnCallData {
   roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
@@ -30,7 +32,13 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 export function OnCallPage() {
+  const { session } = useAuth();
+  const isAdmin = session ? roleMeets(session.user.role, 'admin') : false;
   const [data, setData] = useState<OnCallData | null>(null);
+  const [schedulers, setSchedulers] = useState<{ name: string; running: boolean; last_status?: string; next_run_epoch?: number | null; runs?: number }[]>([]);
+  const [muteEvents, setMuteEvents] = useState<{ id: string; at: string; actor: string; action: string; venue_id: string }[]>([]);
+  const [testUrl, setTestUrl] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
   const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
@@ -74,11 +82,15 @@ export function OnCallPage() {
     apiExt.getBurnTrend(24, 12).then((t) => ok && setTrend(t.buckets)).catch(() => ok && setTrend([]));
     apiExt.getBurnByVenue().then((r) => ok && setByVenue(r.venues)).catch(() => ok && setByVenue([]));
     apiExt.getDigestDeliveries().then((d) => ok && setDigests(d)).catch(() => ok && setDigests([]));
+    apiExt.getMuteEvents().then((r) => ok && setMuteEvents(r.events)).catch(() => ok && setMuteEvents([]));
+    if (isAdmin) {
+      apiExt.getSchedulers().then((s) => ok && setSchedulers(s)).catch(() => ok && setSchedulers([]));
+    }
     loadHistory('');
     return () => {
       ok = false;
     };
-  }, [loadHistory]);
+  }, [loadHistory, isAdmin]);
 
   if (loading) return <p className="muted">Loading on-call directory…</p>;
   if (!data) return <p className="muted">On-call directory unavailable.</p>;
@@ -278,6 +290,92 @@ export function OnCallPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {muteEvents.length > 0 && (
+        <div className="panel">
+          <header><h3>Digest mute history</h3></header>
+          <div className="body">
+            <table className="data-table">
+              <thead>
+                <tr><th>When</th><th>Actor</th><th>Action</th><th>Venue</th></tr>
+              </thead>
+              <tbody>
+                {muteEvents.slice(0, 12).map((e) => (
+                  <tr key={e.id}>
+                    <td className="mono">{new Date(e.at).toLocaleString()}</td>
+                    <td>{e.actor}</td>
+                    <td>{e.action}</td>
+                    <td className="mono">{e.venue_id}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && schedulers.length > 0 && (
+        <div className="panel">
+          <header><h3>Background schedulers</h3></header>
+          <div className="body">
+            <table className="data-table">
+              <thead>
+                <tr><th>Scheduler</th><th>Running</th><th>Last</th><th>Runs</th><th>Next run</th></tr>
+              </thead>
+              <tbody>
+                {schedulers.map((s) => (
+                  <tr key={s.name}>
+                    <td>{s.name}</td>
+                    <td>
+                      <span className={`status-badge ${s.running ? 'status-ok' : 'status-fail'}`}>
+                        {s.running ? 'running' : 'stopped'}
+                      </span>
+                    </td>
+                    <td>{s.last_status ?? '—'}</td>
+                    <td>{s.runs ?? 0}</td>
+                    <td className="mono">
+                      {s.next_run_epoch ? new Date(s.next_run_epoch * 1000).toLocaleTimeString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="panel">
+          <header><h3>Test webhook</h3></header>
+          <div className="body">
+            <div className="seg-control">
+              <input
+                className="text-input"
+                placeholder="https://hooks.example/..."
+                value={testUrl}
+                onChange={(e) => setTestUrl(e.target.value)}
+                style={{ minWidth: 260 }}
+              />
+              <button
+                className="seg"
+                disabled={!testUrl}
+                onClick={async () => {
+                  setTestResult('sending…');
+                  try {
+                    const r = await apiExt.testWebhook(testUrl);
+                    setTestResult(r.delivered ? 'Delivered ✓' : 'Failed ✗');
+                  } catch {
+                    setTestResult('Failed ✗');
+                  }
+                }}
+              >
+                Send test
+              </button>
+              {testResult && <span className="hint">{testResult}</span>}
+            </div>
           </div>
         </div>
       )}
