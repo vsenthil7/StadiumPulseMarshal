@@ -70,7 +70,7 @@ def test_login_success_and_failure_audited():
         async def _q():
             return await app.state.ctx.audit.query()
         import asyncio
-        rows = asyncio.get_event_loop().run_until_complete(_q())
+        rows = asyncio.run(_q())
         actions = [(e.action, e.metadata.get("outcome")) for e in rows]
         assert ("auth.login", "success") in actions
         assert ("auth.login", "failure") in actions
@@ -90,7 +90,7 @@ def test_reuse_detection_is_audited():
         async def _q():
             return await app.state.ctx.audit.query()
         import asyncio
-        rows = asyncio.get_event_loop().run_until_complete(_q())
+        rows = asyncio.run(_q())
         actions = [e.action for e in rows]
         assert "auth.refresh_reuse_detected" in actions
 

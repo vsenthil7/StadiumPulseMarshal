@@ -120,7 +120,11 @@ def _auth_app(**kw):
     settings = Settings(use_mocks=True, auth_enabled=True, **kw)
     with TestClient(app) as c:
         ctx = AppContext(settings)
-        asyncio.get_event_loop().run_until_complete(ctx.startup())
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(ctx.startup())
+        finally:
+            loop.close()
         app.state.ctx = ctx
         yield c
 
