@@ -8,8 +8,9 @@ Supported:
   /marshal runbook <id>           — show runbook steps
   /marshal runbook <id> execute   — execute a runbook
 
-HMAC signature verification is skipped when SLACK_SIGNING_SECRET is unset
-(mock/demo mode), so the endpoint is always testable.
+HMAC signature verification (Slack's v0 scheme) is enforced when
+SLACK_SIGNING_SECRET is set, and skipped otherwise (mock/demo/CI), so the
+endpoint stays testable without a secret while being secure in production.
 """
 from __future__ import annotations
 
@@ -40,10 +41,24 @@ async def slack_command(request: Request) -> JSONResponse:
     # Parse the urlencoded body directly so we don't depend on python-multipart.
     from urllib.parse import parse_qs
 
-    raw = (await request.body()).decode("utf-8", "ignore")
+    from app.services.slack_signing import verify_slack_signature
+
+    raw_bytes = await request.body()
+    ctx = request.app.state.ctx
+    if not verify_slack_signature(
+        signing_secret=getattr(ctx.settings, "slack_signing_secret", None),
+        timestamp=request.headers.get("X-Slack-Request-Timestamp"),
+        signature=request.headers.get("X-Slack-Signature"),
+        raw_body=raw_bytes,
+        max_age_seconds=getattr(ctx.settings, "slack_signature_max_age_seconds", 300),
+    ):
+        return JSONResponse(status_code=401,
+                            content={"response_type": "ephemeral",
+                                     "text": "Signature verification failed."})
+
+    raw = raw_bytes.decode("utf-8", "ignore")
     form = {k: v[0] for k, v in parse_qs(raw).items()}
     text = (form.get("text") or "").strip()
-    ctx = request.app.state.ctx
 
     parts = text.split()
     sub = parts[0].lower() if parts else "help"

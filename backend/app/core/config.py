@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     ansible_awx_url: str | None = None
     ansible_awx_token: str | None = None
     remediation_webhook_url: str | None = None
+    # --- P6.M6 ChatOps: Slack request signing (optional) ---
+    # When set, /chatops/slack/command verifies Slack's v0 HMAC signature.
+    slack_signing_secret: str | None = None
+    slack_signature_max_age_seconds: int = 300
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

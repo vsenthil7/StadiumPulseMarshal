@@ -1548,3 +1548,28 @@ the same DB. In-memory default path unchanged (DB-less tests still green).
 ### Round 31 — COMPLETE
 ### Remaining (smallest): ChatOps Slack HMAC verification; live-cred integration
 ### tests for DT/PagerDuty/OpsGenie/Cloud Workflows + real Cloud Run deploy + k6 run.
+
+---
+
+## Round 32 — ChatOps Slack HMAC verification
+
+Closed the last fully-testable hardening item:
+
+- **Slack v0 signature verification** (`app/services/slack_signing.py`):
+  verify_slack_signature() implements Slack's `v0:{ts}:{body}` HMAC-SHA256 scheme
+  with constant-time comparison + a replay window (default 300s). Skips
+  verification only when no secret is configured (demo/CI); enforces it otherwise.
+- **Route** `/chatops/slack/command` now reads the raw body, verifies the
+  `X-Slack-Signature` / `X-Slack-Request-Timestamp` headers against
+  SLACK_SIGNING_SECRET, and returns 401 on failure before doing any work.
+- Config: `slack_signing_secret`, `slack_signature_max_age_seconds`; documented
+  in `.env.example`.
+
+**+9 tests** (verifier unit: valid/tampered/stale/missing/wrong-secret/no-secret;
+route: open without secret, 401 unsigned, 200 correctly signed). Backend **508
+pass**. Existing chatops tests unaffected (no secret set by default).
+
+### Round 32 — COMPLETE
+### Remaining: live-credential / live-infra validation only (DT/PagerDuty/OpsGenie/
+### Cloud Workflows real round-trips, real Cloud Run deploy, k6 run) — needs your
+### environment; all such adapters are structurally complete + mock-tested here.
