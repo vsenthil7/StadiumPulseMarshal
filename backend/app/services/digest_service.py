@@ -76,21 +76,34 @@ async def compose_daily_digest(ctx) -> str:
 _SEV_RANK = {"none": 0, "ticket": 1, "page": 2}
 
 
-def next_run_delay(hh_mm: str, now_epoch: float | None = None) -> float:
-    """Seconds until the next occurrence of local ``HH:MM``.
+def next_run_delay(hh_mm: str, now_epoch: float | None = None,
+                   tz: str | None = None) -> float:
+    """Seconds until the next occurrence of ``HH:MM`` in timezone ``tz``.
 
-    If that time has already passed today, returns the delay until tomorrow.
+    ``tz`` is an IANA name (e.g. "Europe/London"); when omitted, the server's
+    local time is used. If the time has already passed today, returns the delay
+    until tomorrow.
     """
     import time as _t
+    from datetime import datetime
 
     now = _t.time() if now_epoch is None else now_epoch
-    lt = _t.localtime(now)
     try:
         hh, mm = (int(x) for x in hh_mm.split(":"))
     except (ValueError, AttributeError):
         hh, mm = 9, 0
-    # seconds since local midnight
-    since_midnight = lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec
+
+    tzinfo = None
+    if tz:
+        try:
+            from zoneinfo import ZoneInfo
+
+            tzinfo = ZoneInfo(tz)
+        except Exception:  # noqa: BLE001 - bad tz name → fall back to local
+            tzinfo = None
+
+    dt = datetime.fromtimestamp(now, tzinfo)
+    since_midnight = dt.hour * 3600 + dt.minute * 60 + dt.second
     target = hh * 3600 + mm * 60
     delay = target - since_midnight
     if delay <= 0:
@@ -101,11 +114,12 @@ def next_run_delay(hh_mm: str, now_epoch: float | None = None) -> float:
 class DailyAtScheduler:
     """Runs a composer+dispatch once per day at a wall-clock ``HH:MM``."""
 
-    def __init__(self, ctx, at: str, composer, dispatch) -> None:
+    def __init__(self, ctx, at: str, composer, dispatch, tz: str | None = None) -> None:
         self._ctx = ctx
         self._at = at
         self._composer = composer
         self._dispatch = dispatch
+        self._tz = tz
         self._task = None
 
     def start(self) -> None:
@@ -126,7 +140,7 @@ class DailyAtScheduler:
     async def _run(self) -> None:
         while True:
             try:
-                await asyncio.sleep(next_run_delay(self._at))
+                await asyncio.sleep(next_run_delay(self._at, tz=self._tz))
                 msg = await self._composer(self._ctx)
                 if self._dispatch is not None:
                     await self._dispatch(msg)
@@ -226,3 +240,58 @@ class DigestScheduler:
                 raise
             except Exception as exc:  # noqa: BLE001 - never let the loop die
                 log.warning("digest cycle failed: %s", exc)
+
+
+class VenueFanoutScheduler:
+    """Periodically composes a per-venue digest for each mapped venue and
+    dispatches it to that venue's channel, skipping muted venues.
+
+    ``venue_channels`` maps venue_id → recipient; ``dispatch`` receives
+    (venue_id, recipient, message). Idempotent start/stop like the others.
+    """
+
+    def __init__(self, ctx, interval_seconds: float, venue_channels: dict,
+                 dispatch, mute_store=None) -> None:
+        self._ctx = ctx
+        self._interval = interval_seconds
+        self._venue_channels = venue_channels
+        self._dispatch = dispatch
+        self._mute_store = mute_store
+        self._task = None
+
+    def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
+        self._task = asyncio.ensure_future(self._run())
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+        self._task = None
+
+    async def run_once(self) -> list[str]:
+        """Compose+dispatch for each mapped, unmuted venue. Returns venues sent."""
+        sent: list[str] = []
+        for venue_id, recipient in self._venue_channels.items():
+            if self._mute_store is not None and await self._mute_store.is_muted(venue_id):
+                continue
+            msg = await compose_venue_digest(self._ctx, venue_id)
+            if self._dispatch is not None:
+                await self._dispatch(venue_id, recipient, msg)
+            sent.append(venue_id)
+        return sent
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(self._interval)
+                await self.run_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log.warning("venue fan-out cycle failed: %s", exc)

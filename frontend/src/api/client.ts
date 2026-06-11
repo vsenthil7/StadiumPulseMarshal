@@ -201,6 +201,18 @@ export const apiExt = {
     http<{ notifications: NotificationItem[] }>('/notifications?severity=digest').then(
       (r) => r.notifications,
     ),
+  muteVenueDigest: (venueId: string, minutes = 60) =>
+    http<{ venue_id: string; muted_until: number }>('/slo/burn-digest/mute', {
+      method: 'POST', body: JSON.stringify({ venue_id: venueId, minutes }),
+    }),
+  unmuteVenueDigest: (venueId: string) =>
+    http<{ venue_id: string; cleared: boolean }>(
+      `/slo/burn-digest/mute?venue_id=${encodeURIComponent(venueId)}`, { method: 'DELETE' },
+    ),
+  resendNotification: (id: string) =>
+    http<{ id: string; status: string; delivered: boolean }>(
+      `/notifications/${encodeURIComponent(id)}/resend`, { method: 'POST' },
+    ),
   getScenarios: () =>
     http<{ scenarios: ScenarioInfo[]; active: string }>('/scenarios'),
   selectScenario: (key: string) =>

@@ -34,8 +34,25 @@ export function OnCallPage() {
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
   const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
-  const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number; suppression_ratio?: number }[]>([]);
+  const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number; suppression_ratio?: number; muted?: boolean }[]>([]);
   const [digests, setDigests] = useState<{ id: string; subject: string; recipient: string; status: string; created_at: string }[]>([]);
+
+  const refreshVenues = useCallback(() => {
+    apiExt.getBurnByVenue().then((r) => setByVenue(r.venues)).catch(() => setByVenue([]));
+  }, []);
+  const refreshDigests = useCallback(() => {
+    apiExt.getDigestDeliveries().then((d) => setDigests(d)).catch(() => setDigests([]));
+  }, []);
+
+  const toggleMute = async (venueId: string, muted: boolean) => {
+    if (muted) await apiExt.unmuteVenueDigest(venueId);
+    else await apiExt.muteVenueDigest(venueId, 60);
+    refreshVenues();
+  };
+  const resend = async (id: string) => {
+    await apiExt.resendNotification(id);
+    refreshDigests();
+  };
   const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -208,7 +225,7 @@ export function OnCallPage() {
             <BurnByVenueChart venues={byVenue} />
             <table className="data-table">
               <thead>
-                <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th><th>Suppr.</th></tr>
+                <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th><th>Suppr.</th><th>Digest</th></tr>
               </thead>
               <tbody>
                 {byVenue.map((v) => (
@@ -219,6 +236,13 @@ export function OnCallPage() {
                     <td>{v.active_acks}</td>
                     <td>{v.active_silences}</td>
                     <td>{v.suppression_ratio != null ? `${Math.round(v.suppression_ratio * 100)}%` : '—'}</td>
+                    <td>
+                      {v.venue_id !== 'unassigned' && (
+                        <button className="seg" onClick={() => toggleMute(v.venue_id, !!v.muted)}>
+                          {v.muted ? 'Unmute' : 'Mute 1h'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -233,7 +257,7 @@ export function OnCallPage() {
           <div className="body">
             <table className="data-table">
               <thead>
-                <tr><th>When</th><th>Recipient</th><th>Status</th></tr>
+                <tr><th>When</th><th>Recipient</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
                 {digests.slice(0, 15).map((d) => (
@@ -244,6 +268,11 @@ export function OnCallPage() {
                       <span className={`status-badge ${d.status === 'SENT' ? 'status-ok' : 'status-fail'}`}>
                         {d.status}
                       </span>
+                    </td>
+                    <td>
+                      {d.status === 'FAILED' && (
+                        <button className="seg" onClick={() => resend(d.id)}>Resend</button>
+                      )}
                     </td>
                   </tr>
                 ))}

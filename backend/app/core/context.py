@@ -60,8 +60,12 @@ class AppContext:
         from app.services.burn_counters import BurnCounters
 
         self.burn_counters = BurnCounters(self.kv)
+        from app.services.digest_mute_store import DigestMuteStore
+
+        self.digest_mutes = DigestMuteStore(self.kv)
         self.digest_scheduler = None
         self.daily_digest_scheduler = None
+        self.venue_fanout_scheduler = None
         from app.services.schedule_source import build_schedule_source
 
         self.schedule_source = build_schedule_source(
@@ -424,8 +428,29 @@ class AppContext:
 
             self.daily_digest_scheduler = DailyAtScheduler(
                 self, self.settings.burn_daily_digest_at,
-                composer=compose_daily_digest, dispatch=_dispatch_daily)
+                composer=compose_daily_digest, dispatch=_dispatch_daily,
+                tz=self.settings.burn_daily_digest_tz)
             self.daily_digest_scheduler.start()
+        if self.settings.burn_digest_venue_fanout_enabled \
+                and self.settings.burn_digest_venue_channel_map:
+            from app.services.digest_service import VenueFanoutScheduler
+            from app.models.notification import NotificationChannel
+
+            fch = NotificationChannel(self.settings.burn_digest_channel) \
+                if self.settings.burn_digest_channel in {c.value for c in NotificationChannel} \
+                else NotificationChannel.SLACK
+
+            async def _dispatch_venue(venue_id: str, recipient: str, msg: str) -> None:
+                await self.notifications.notify_digest(
+                    msg, channel=fch, recipient=recipient,
+                    webhook_url=self.settings.burn_digest_webhook_url,
+                    webhook_poster=self.webhook_dispatcher.post_message)
+
+            self.venue_fanout_scheduler = VenueFanoutScheduler(
+                self, self.settings.burn_digest_venue_fanout_interval_seconds,
+                self.settings.burn_digest_venue_channel_map,
+                dispatch=_dispatch_venue, mute_store=self.digest_mutes)
+            self.venue_fanout_scheduler.start()
 
     async def probe_readiness(self) -> dict:
         """Actively probe dependencies for the readiness endpoint."""
@@ -451,6 +476,8 @@ class AppContext:
             await self.digest_scheduler.stop()
         if getattr(self, "daily_digest_scheduler", None) is not None:
             await self.daily_digest_scheduler.stop()
+        if getattr(self, "venue_fanout_scheduler", None) is not None:
+            await self.venue_fanout_scheduler.stop()
         await self.relay.stop()
         try:
             await self.kv.close()

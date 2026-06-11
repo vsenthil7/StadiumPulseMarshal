@@ -83,8 +83,11 @@ class Settings(BaseSettings):
     burn_daily_digest_channel: str = Field(default="slack")
     burn_daily_digest_recipient: str = Field(default="#slo-daily")
     burn_daily_digest_at: str = Field(default="09:00")
+    burn_daily_digest_tz: str | None = None
     # Per-venue digest channel routing, e.g. "venue_arena_north=#north,..."
     burn_digest_venue_channels: str = Field(default="")
+    burn_digest_venue_fanout_enabled: bool = Field(default=False)
+    burn_digest_venue_fanout_interval_seconds: float = Field(default=3600.0)
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

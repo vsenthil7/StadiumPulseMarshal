@@ -789,3 +789,30 @@ dispatch, routes to that venue's channel from `BURN_DIGEST_VENUE_CHANNELS`
 
 ### Tests
 Backend **422 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 24 — Per-venue fan-out, TZ-aware daily, per-venue mute, FAILED resend
+
+### Scheduled per-venue fan-out
+A `VenueFanoutScheduler` composes each mapped venue's digest and dispatches it to
+that venue's channel on an interval, skipping muted venues
+(`BURN_DIGEST_VENUE_FANOUT_ENABLED` / `..._INTERVAL_SECONDS`).
+
+### Timezone-aware daily digest
+`BURN_DAILY_DIGEST_TZ` (an IANA name) makes the daily wall-clock time fire in a
+specific zone rather than the server's local time.
+
+### Per-venue digest mute/snooze
+Operators can mute a venue's digest for a window via
+`POST /slo/burn-digest/mute` (and `DELETE` to lift early); muted venues are
+skipped by both on-demand dispatch and the fan-out scheduler, and the mute state
+shows on the On-call venue table with a toggle.
+
+### Re-send failed digests
+`POST /notifications/{id}/resend` re-posts a digest via the webhook and updates
+its status; the On-call delivery-history panel shows a Resend button on FAILED
+rows.
+
+### Tests
+Backend **431 pass** (+9 this round). Frontend `tsc -b` + `vite build` green.

@@ -110,6 +110,46 @@ async def list_notifications(
     return NotificationListResponse(notifications=notifications)
 
 
+@router.post("/notifications/{notification_id}/resend", tags=["incidents"])
+async def resend_notification(
+    notification_id: str, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Re-send a failed digest notification via the webhook (responder+).
+
+    Only digest-source notifications are resendable here; re-posts to the
+    configured webhook and flips status to SENT on success.
+    """
+    ctx = _ctx(request)
+    all_n = await ctx.notifications.list_all()
+    target = next((n for n in all_n if n.id == notification_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="notification not found")
+    if target.severity != "digest":
+        raise HTTPException(status_code=400, detail="only digest notifications are resendable")
+
+    from app.services.notification_service import format_webhook_payload
+    from app.models.notification import NotificationStatus
+
+    delivered = True
+    url = ctx.settings.burn_digest_webhook_url
+    if url:
+        delivered = await ctx.webhook_dispatcher.post_message(
+            url, format_webhook_payload(target.body, target.channel, target.recipient))
+    target.status = NotificationStatus.SENT if delivered else NotificationStatus.FAILED
+    await ctx.notifications._repo.update(target)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="digest.resend",
+            resource_type="notification", resource_id=notification_id,
+            metadata={"delivered": delivered},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"id": notification_id, "status": getattr(target.status, "value", target.status),
+            "delivered": delivered}
+
+
 @router.get("/slo/{slo_id}/metric-preview", tags=["slo"])
 async def slo_metric_preview(
     slo_id: str, request: Request, lookback_hours: float = 6.0,

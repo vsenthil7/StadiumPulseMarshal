@@ -86,6 +86,50 @@ async def slo_burn_events(
     return {"events": page, "total": total, "offset": offset, "limit": limit}
 
 
+class _MuteBody(BaseModel):
+    venue_id: str
+    minutes: float = 60.0
+
+
+@router.post("/slo/burn-digest/mute", tags=["slo"])
+async def mute_venue_digest(
+    body: _MuteBody, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Mute a venue's digest fan-out for a window (responder+, audited)."""
+    ctx = _ctx(request)
+    require_venue_access(principal, body.venue_id)
+    until = await ctx.digest_mutes.mute(body.venue_id, body.minutes, principal.subject)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="digest.mute",
+            resource_type="venue_digest", resource_id=body.venue_id,
+            metadata={"minutes": body.minutes},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"venue_id": body.venue_id, "muted_until": until}
+
+
+@router.delete("/slo/burn-digest/mute", tags=["slo"])
+async def unmute_venue_digest(
+    venue_id: str, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Lift a venue digest mute early (responder+, audited)."""
+    ctx = _ctx(request)
+    require_venue_access(principal, venue_id)
+    cleared = await ctx.digest_mutes.unmute(venue_id)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="digest.unmute",
+            resource_type="venue_digest", resource_id=venue_id, metadata={},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"venue_id": venue_id, "cleared": cleared}
+
+
 @router.get("/slo/burn-digest", tags=["slo"])
 async def slo_burn_digest(
     request: Request, hours: float = 24.0, min_severity: str = "ticket",
@@ -113,6 +157,10 @@ async def slo_burn_digest(
     if dispatch:
         if not principal.has(Permission.REMEDIATION_APPROVE):
             raise HTTPException(status_code=403, detail="dispatch requires responder")
+        if venue_id is not None and await ctx.digest_mutes.is_muted(venue_id):
+            return {"digest": msg, "dispatched": False, "muted": True,
+                    "recipient": ctx.settings.burn_digest_venue_channel_map.get(
+                        venue_id, ctx.settings.burn_digest_recipient)}
         from app.models.notification import NotificationChannel
 
         ch_name = ctx.settings.burn_digest_channel
@@ -178,6 +226,7 @@ async def slo_burn_by_venue(
 
     # Enrich each venue with lifetime ack/silence counts + suppression ratio.
     for vid, row in venues.items():
+        row["muted"] = await ctx.digest_mutes.is_muted(vid) if vid != "unassigned" else False
         if vid == "unassigned":
             row["ack"] = 0
             row["silence"] = 0

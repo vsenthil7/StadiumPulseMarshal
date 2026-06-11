@@ -1244,3 +1244,61 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **CF2:** docs + package.
 
 ### Round 23 — COMPLETE
+
+---
+
+## Round 24 — Scheduled per-venue fan-out, TZ-aware daily, per-venue mute, FAILED re-send
+
+### Track CG — scheduled per-venue fan-out
+| # | Sprint | Status |
+|---|--------|--------|
+| CG1 | VenueFanoutScheduler: per-venue digest to mapped channels on interval | 🟢 |
+| CG2 | Config BURN_DIGEST_VENUE_FANOUT_ENABLED + interval; honors mute | 🟢 |
+| CG3 | Tests: fan-out composes+routes per venue; skips unmapped | 🟢 |
+
+### Track CH — timezone-aware daily scheduling
+| # | Sprint | Status |
+|---|--------|--------|
+| CH1 | next_run_delay accepts tz (zoneinfo); DailyAtScheduler tz param | 🟢 |
+| CH2 | Config BURN_DAILY_DIGEST_TZ; context passes it | 🟢 |
+| CH3 | Tests: delay computed in given tz | 🟢 |
+
+### Track CI — per-venue digest mute/snooze
+| # | Sprint | Status |
+|---|--------|--------|
+| CI1 | DigestMuteStore (KV hash, until-epoch); is_muted/mute/unmute | 🟢 |
+| CI2 | POST /slo/burn-digest/mute + DELETE (responder+, audited) | 🟢 |
+| CI3 | Dispatch + fan-out skip muted venues | 🟢 |
+| CI4 | Frontend: mute toggle on venue table | 🟢 |
+| CI5 | Tests: mute suppresses dispatch; expiry | 🟢 |
+
+### Track CJ — re-send FAILED digests
+| # | Sprint | Status |
+|---|--------|--------|
+| CJ1 | POST /notifications/{id}/resend (responder+, digest only) | 🟢 |
+| CJ2 | Re-posts via webhook; updates status; audited | 🟢 |
+| CJ3 | Frontend: Resend button on FAILED rows | 🟢 |
+| CJ4 | Tests: resend flips FAILED→SENT on success | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| CK1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| CK2 | Docs + package | 🟢 |
+
+### Round 24 changelog
+- **CG — scheduled per-venue fan-out:** VenueFanoutScheduler composes+dispatches
+  each mapped venue's digest on an interval, skipping muted venues (run_once tested
+  for routing + skip). Config BURN_DIGEST_VENUE_FANOUT_ENABLED/INTERVAL.
+- **CH — TZ-aware daily:** next_run_delay(at, tz) uses zoneinfo; DailyAtScheduler
+  takes a tz (BURN_DAILY_DIGEST_TZ). +tests (UTC vs Tokyo differ; bad tz falls back).
+- **CI — per-venue mute/snooze:** DigestMuteStore (KV hash, until-epoch, prune on
+  read); POST/DELETE /slo/burn-digest/mute (responder+, audited); dispatch + fan-out
+  skip muted; burn-by-venue shows muted; On-call mute toggle. +tests. Live-verified.
+- **CJ — resend FAILED digests:** POST /notifications/{id}/resend (responder+, digest
+  only) re-posts via webhook, updates status, audited; On-call Resend button on
+  FAILED rows. +tests. Live-verified (→SENT).
+- **CK1:** backend **431 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **CK2:** docs + package.
+
+### Round 24 — COMPLETE
