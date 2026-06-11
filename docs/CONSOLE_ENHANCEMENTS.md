@@ -510,3 +510,33 @@ test.
 
 ### Tests
 Backend **342 pass** (+14 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 14 — On-call-routed burns, metrics-backend adapter, on-call console
+
+### Burn alerts route through the on-call directory
+Burn-rate alerts now page the same people as incident escalation, via an
+`OnCallDirectory` that maps severity → escalation tier → on-call engineer:
+page → incident commander (TIER3) + SRE (TIER2); ticket → SRE (TIER2) + venue
+ops (TIER1). Each target carries the engineer's real handle and preferred
+channels, with a fallback to the highest available tier if one is vacant.
+Verified live: a ticket burn routed to the real SRE handle (slack+sms) and venue
+ops (email), not hardcoded addresses.
+
+### Metrics-backend adapter feeds true per-window series
+A `MetricsSource` yields a per-SLO error-rate timeseries that is backfilled into
+`MetricsHistory`, so the multi-window burn engine evaluates on genuine windowed
+data. `SyntheticMetricsSource` shapes deterministic series (recent spike /
+sustained / healthy / recovered) for mock mode; `DynatraceMetricsSource` pulls
+from the Dynatrace Metrics v2 API and converts datapoints to error-rate samples,
+falling back to synthetic on any error.
+
+### On-call console
+`GET /oncall` returns the roster, escalation policy ladders, and the resolved
+burn-alert targets per severity. The On-call page (Administration) shows all
+three so an operator can see exactly who a page or ticket would reach before it
+fires.
+
+### Tests
+Backend **356 pass** (+14 this round). Frontend `tsc -b` + `vite build` green.

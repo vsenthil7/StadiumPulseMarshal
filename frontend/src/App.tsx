@@ -7,6 +7,7 @@ import { WebhooksPage } from './pages/WebhooksPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { HealthPage } from './pages/HealthPage';
 import { SecurityPage } from './pages/SecurityPage';
+import { OnCallPage } from './pages/OnCallPage';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Sidebar } from './components/shell/Sidebar';
@@ -71,6 +72,7 @@ function Shell() {
           {activeTab === 'audit' && <AuditLogPage />}
           {activeTab === 'security' && <SecurityPage />}
           {activeTab === 'health' && <HealthPage />}
+          {activeTab === 'oncall' && <OnCallPage />}
         </main>
       </div>
     </div>

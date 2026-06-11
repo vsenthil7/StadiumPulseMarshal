@@ -60,3 +60,20 @@ async def test_distinct_slos_not_deduped():
 async def test_none_severity_routes_nowhere():
     svc = NotificationService(MemoryNotificationRepository())
     assert await svc.notify_burn_alert(_alert(BurnSeverity.NONE)) == []
+
+
+@pytest.mark.asyncio
+async def test_notifications_filter_by_source_via_api():
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    with TestClient(create_app()) as c:
+        tok = c.post("/api/v1/auth/login",
+                     json={"email": "sre@stadiumpulse.demo",
+                           "password": "MatchdayDemo123!"}).json()["token"]
+        h = {"Authorization": f"Bearer {tok}"}
+        # trigger burn alerts → burn-sourced notifications
+        c.get("/api/v1/slo/burn-alerts", headers=h)
+        alln = c.get("/api/v1/notifications", headers=h).json()["notifications"]
+        burn = c.get("/api/v1/notifications?source=burn_alert", headers=h).json()["notifications"]
+        assert burn and all(n["source"] == "burn_alert" for n in burn)
+        assert len(burn) <= len(alln)

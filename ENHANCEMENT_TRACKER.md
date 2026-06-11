@@ -724,3 +724,72 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **AD2:** docs + package.
 
 ### Round 13 — COMPLETE
+
+---
+
+## Round 14 — On-call-routed burns, metrics-backend adapter, +module depth
+
+### Track AE — burn recipients via on-call/escalation directory
+| # | Sprint | Status |
+|---|--------|--------|
+| AE1 | OnCallDirectory: severity→tier→engineer(handle,channels) resolver | 🟢 |
+| AE2 | notify_burn_alert routes via directory (real handles/channels) | 🟢 |
+| AE3 | Burn severity→tier map (page→TIER3/2, ticket→TIER2/1); fallback | 🟢 |
+| AE4 | Tests: page→IC pagerduty handle, ticket→SRE channels, fallback | 🟢 |
+
+### Track AF — metrics-backend adapter → MetricsHistory per-window series
+| # | Sprint | Status |
+|---|--------|--------|
+| AF1 | MetricsSource protocol; SyntheticMetricsSource (per-window series) | 🟢 |
+| AF2 | DynatraceMetricsSource (timeseries API shape) w/ graceful fallback | 🟢 |
+| AF3 | backfill MetricsHistory from source; build_metrics_source by config | 🟢 |
+| AF4 | Burn engine uses backfilled real windows; context wires source | 🟢 |
+| AF5 | Tests: synthetic series populates windows; DT adapter parse+fallback | 🟢 |
+
+### Track AG — on-call console module
+| # | Sprint | Status |
+|---|--------|--------|
+| AG1 | Backend: /oncall (roster + policies, scoped read) | 🟢 |
+| AG2 | Frontend: On-call page (roster, policy ladders, current tier targets) | 🟢 |
+| AG3 | Nav entry (Administration); tests + tsc/build | 🟢 |
+
+### Track AH — supporting depth
+| # | Sprint | Status |
+|---|--------|--------|
+| AH1 | Notifications API: filter by source/severity/venue + counts | 🟢 |
+| AH2 | Burn alert detail: include on-call target(s) in the alert payload | 🟢 |
+| AH3 | Tests + tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| AI1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| AI2 | Docs + package | 🟢 |
+
+### Round 14 changelog
+- **Track AE — burn recipients via on-call directory:** OnCallDirectory maps burn
+  severity → escalation tier → on-call engineer (page→TIER3+TIER2, ticket→
+  TIER2+TIER1), using the roster's real handles + preferred channels, with a
+  vacant-tier fallback. notify_burn_alert routes through it (static policy
+  remains as fallback). +5 tests. Live-verified: ticket burn paged the real SRE
+  (slack+sms) and Venue Ops (email) handles.
+- **Track AF — metrics-backend adapter:** MetricsSource protocol; SyntheticMetricsSource
+  (deterministic per-window series: fast spike / sustained / healthy / recovered)
+  and DynatraceMetricsSource (Metrics v2 timeseries → error-rate samples, graceful
+  fallback). backfill_history primes MetricsHistory; build_metrics_source by config;
+  context backfills before burn evaluation so multi-window burns run on REAL windowed
+  data. +7 tests (synthetic series, backfill, DT parse %/fraction, live pull,
+  fallback, builder).
+- **Track AG — on-call console:** GET /oncall (roster + policies + burn targets);
+  frontend On-call page (roster table, burn-alert routing by severity, escalation
+  ladders) under Administration. +1 test.
+- **Track AH — depth:** /notifications source/severity filters; burn targets exposed
+  via /oncall. +1 test.
+- **Fix:** caught a real structural bug — a method definition had been inserted mid
+  __init__, orphaning later context wiring (prune_scheduler etc.); the failing
+  /oncall test surfaced it and it's fixed.
+- **AI1:** backend **356 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **AI2:** docs + package.
+
+### Round 14 — COMPLETE

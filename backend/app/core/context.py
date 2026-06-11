@@ -36,6 +36,10 @@ class AppContext:
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )
+        from app.services.oncall_directory import OnCallDirectory
+
+        self.oncall_directory = OnCallDirectory(default_on_call())
+        self.notifications.set_oncall_directory(self.oncall_directory)
         # Event bus + webhook dispatcher.
         import httpx
 
@@ -75,6 +79,10 @@ class AppContext:
         from app.services.metrics_history import MetricsHistory
 
         self.metrics_history = MetricsHistory()
+        from app.services.metrics_source import build_metrics_source
+
+        self.metrics_source = build_metrics_source(self.settings)
+        self._metrics_backfilled = False
         from app.services.entity_venue import EntityVenueResolver
 
         self.entity_venue = EntityVenueResolver()
@@ -95,6 +103,22 @@ class AppContext:
             self.settings.auth_rate_limit_per_minute, kv=self.kv
         )
         self.current_scenario = self._initial_scenario()
+
+    async def ensure_metrics_backfill(self) -> None:
+        """Prime MetricsHistory with a real per-window error series from the
+        configured metrics source (synthetic in mock mode, Dynatrace when
+        configured). Idempotent — runs once unless the scenario changes."""
+        if self._metrics_backfilled:
+            return
+        from app.services.metrics_source import backfill_history
+
+        try:
+            await backfill_history(
+                self.metrics_source, self.slo_engine.slos, self.metrics_history,
+            )
+            self._metrics_backfilled = True
+        except Exception:  # pragma: no cover - defensive
+            pass
 
     async def ensure_entity_venue_map(self) -> None:
         """Populate the entity→venue resolver lazily from the active client.
@@ -139,6 +163,7 @@ class AppContext:
             self.current_scenario = key
             self.slo_engine = SLOEngine(self._collect_slos())
             self.entity_venue.invalidate()
+            self._metrics_backfilled = False
 
     async def evaluate_slos(self):
         """Compute current error budgets from synthetic/live measurements."""
@@ -215,6 +240,7 @@ class AppContext:
         from app.services.burn_alerts import evaluate_burn_alerts
 
         await self.ensure_entity_venue_map()
+        await self.ensure_metrics_backfill()
         budgets = await self.repos.slo.list_budgets()
         if not budgets:
             budgets = await self.evaluate_slos()

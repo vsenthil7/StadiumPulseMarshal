@@ -681,3 +681,13 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .burn-item.burn-page { font-weight: 600; }
 .burn-msg { flex: 1; color: var(--ink); }
 .burn-pct { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* ---------- On-call page ---------- */
+.oncall-page { display: flex; flex-direction: column; gap: 16px; }
+.burn-route-row { display: flex; align-items: flex-start; gap: 12px; padding: 6px 0;
+  border-bottom: 1px solid var(--border); }
+.burn-route-targets { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.policy-block { margin-bottom: 14px; }
+.policy-block h4 { margin: 0 0 6px; font-size: 14px; }
+.policy-ladder { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;
+  font-size: 13px; }

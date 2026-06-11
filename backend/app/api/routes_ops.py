@@ -85,12 +85,63 @@ async def get_analytics(
 async def list_notifications(
     request: Request,
     incident_id: str | None = None,
+    source: str | None = None,
+    severity: str | None = None,
     _p=Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> NotificationListResponse:
     ctx = _ctx(request)
     notifications = await ctx.notifications.list_all() if incident_id is None \
         else await ctx.notifications.list_for_incident(incident_id)
+    if source is not None:
+        notifications = [
+            n for n in notifications
+            if getattr(n.source, "value", n.source) == source
+        ]
+    if severity is not None:
+        notifications = [n for n in notifications if n.severity == severity]
     return NotificationListResponse(notifications=notifications)
+
+
+@router.get("/oncall", tags=["oncall"])
+async def get_oncall(
+    request: Request,
+    _p=Depends(require_permission(Permission.INCIDENT_READ)),
+) -> dict:
+    """On-call roster, escalation policies, and current burn-alert targets.
+
+    Read-only operational reference for the On-call console: who is on each tier,
+    the escalation ladders, and which on-call targets a page/ticket burn alert
+    would notify (so SREs can see routing before an alert fires).
+    """
+    ctx = _ctx(request)
+    esc = ctx.escalation
+    roster = [
+        {
+            "id": e.id, "name": e.name, "tier": e.tier.value,
+            "handle": e.handle, "channels": e.channels,
+        }
+        for e in esc._on_call  # roster is operational reference data
+    ]
+    policies = [
+        {
+            "id": p.id, "name": p.name, "min_severity": p.min_severity.value,
+            "steps": [
+                {"tier": s.tier.value, "after_minutes": s.after_minutes,
+                 "notify_channels": s.notify_channels}
+                for s in p.steps
+            ],
+        }
+        for p in esc._policies
+    ]
+    burn_targets = {
+        sev: [
+            {"name": t.name, "tier": t.tier.value, "recipient": t.recipient,
+             "channels": [c.value for c in t.channels]}
+            for t in ctx.oncall_directory.targets_for_severity(sev)
+        ]
+        for sev in ("page", "ticket")
+    }
+    return {"roster": roster, "policies": policies, "burn_targets": burn_targets}
 
 
 @router.get("/scenarios", response_model=ScenarioListResponse, tags=["scenarios"])

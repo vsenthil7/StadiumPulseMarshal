@@ -42,8 +42,12 @@ _BURN_ROUTING: dict[str, list[tuple[NotificationChannel, str]]] = {
 
 
 class NotificationService:
-    def __init__(self, repo: NotificationRepository) -> None:
+    def __init__(self, repo: NotificationRepository, oncall_directory=None) -> None:
         self._repo = repo
+        self._oncall = oncall_directory
+
+    def set_oncall_directory(self, directory) -> None:
+        self._oncall = directory
 
     async def notify(
         self,
@@ -97,7 +101,18 @@ class NotificationService:
         no new one is sent. Returns the notifications created (possibly empty).
         """
         severity = alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity)
-        routes = _BURN_ROUTING.get(severity, [])
+
+        # Resolve routes: prefer the on-call directory (real roster handles +
+        # channels), fall back to the static severity→channel policy.
+        routes: list[tuple] = []
+        target_meta: list[str] = []
+        if self._oncall is not None:
+            for t in self._oncall.targets_for_severity(severity):
+                for ch in t.channels:
+                    routes.append((ch, t.recipient))
+                target_meta.append(f"{t.name}({t.tier.value})")
+        if not routes:
+            routes = _BURN_ROUTING.get(severity, [])
         if not routes:
             return []
 

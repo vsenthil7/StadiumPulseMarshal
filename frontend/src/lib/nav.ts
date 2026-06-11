@@ -23,6 +23,7 @@ export const NAV_PAGES: NavPage[] = [
   { id: 'P8', tab: 'security',    title: 'Security',    group: 'Governance',     minRole: 'admin',     icon: '\u26e8' },
   { id: 'P6', tab: 'webhooks',    title: 'Webhooks',    group: 'Administration', minRole: 'admin',     icon: '\u2702' },
   { id: 'P7', tab: 'health',      title: 'Health',      group: 'Administration', minRole: 'viewer',    icon: '\u2665' },
+  { id: 'P9', tab: 'oncall',      title: 'On-call',     group: 'Administration', minRole: 'viewer',    icon: '\u260e' },
 ];
 
 export const NAV_GROUPS: NavGroup[] = [

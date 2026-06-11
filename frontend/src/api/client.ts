@@ -125,6 +125,15 @@ export const apiExt = {
       }[];
       page_count: number; ticket_count: number;
     }>('/slo/burn-alerts'),
+  getOnCall: () =>
+    http<{
+      roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
+      policies: {
+        id: string; name: string; min_severity: string;
+        steps: { tier: string; after_minutes: number; notify_channels: string[] }[];
+      }[];
+      burn_targets: Record<string, { name: string; tier: string; recipient: string; channels: string[] }[]>;
+    }>('/oncall'),
   getNotifications: () =>
     http<{ notifications: NotificationItem[] }>('/notifications').then(
       (r) => r.notifications,
