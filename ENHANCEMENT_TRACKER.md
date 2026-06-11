@@ -1614,3 +1614,22 @@ dual-window cred test; k6 run; SBOM + cosign sign; Playwright (needs compose up)
 All corresponding CODE + tests are present and pass via mock/sandbox paths.
 
 ### Round 33 — COMPLETE
+
+---
+
+## Round 34 — `make verify-live` one-command DoD harness
+
+Added `scripts/verify_live.sh` + `make verify-live`: runs every
+environment-dependent Section-7 DoD check in sequence, each guarded so an absent
+prerequisite SKIPs (with the exact requirement) instead of failing. Exit is
+non-zero only when a check that could run actually fails.
+
+Covers: CI run success, Docker non-root inspect, deploy.sh dryrun, Alembic
+fresh-DB 17-table check, multi-replica idempotency (compose), live Dynatrace
+dual-window, k6 matchday thresholds, SBOM + cosign, Secret Manager bindings,
+Playwright smoke. Documented in docs/CONSOLE_ENHANCEMENTS.md.
+
+In-sandbox run: deploy.sh dryrun + Alembic 17-table = PASS; other 9 SKIP cleanly
+(exit 0). Backend **515 pass** unchanged.
+
+### Round 34 — COMPLETE

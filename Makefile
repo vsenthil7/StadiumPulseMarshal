@@ -26,3 +26,8 @@ multi-verify: ## Assert the shared rate limit holds across both replicas
 
 multi-down: ## Tear down the multi-instance stack
 	docker compose down -v
+
+# --- Definition-of-DONE verification ---
+.PHONY: verify-live
+verify-live: ## Run environment-dependent DoD checks (skips cleanly when prereqs absent)
+	./scripts/verify_live.sh

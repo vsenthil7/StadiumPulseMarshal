@@ -840,3 +840,32 @@ connectivity; the On-call page has a URL field and Send-test button.
 
 ### Tests
 Backend **439 pass** (+8 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Live Definition-of-DONE verification (`make verify-live`)
+
+`scripts/verify_live.sh` runs the reviewer doc's Section-7 checks that need a
+real environment (CI, GCP, Docker, k6, Dynatrace creds). Each check is guarded:
+absent prerequisites are **skipped** with the exact requirement, so it never
+reports a false failure. Exit is non-zero only if a check that *could* run fails.
+
+```bash
+# Run everything you can locally (skips the rest):
+make verify-live
+
+# With more wired up:
+GITHUB_REPO=org/stadiumpulse-marshal \
+PROJECT_ID=my-gcp-project REGION=europe-west2 \
+DT_TENANT_URL=https://abc.live.dynatrace.com DT_API_TOKEN=*** \
+BASE_URL=http://localhost:8088 \
+COSIGN_KEY=cosign.key TAG=$(git rev-parse --short HEAD) \
+make verify-live
+```
+
+Checks: CI run success · Docker non-root · `deploy.sh dryrun` · Alembic fresh-DB
+(17 tables) · multi-replica idempotency · live Dynatrace dual-window · k6 matchday
+thresholds · SBOM + cosign · Secret Manager bindings · Playwright smoke.
+
+In this repo's sandbox, `deploy.sh dryrun` and the Alembic 17-table check pass;
+the rest skip pending their prerequisites in your environment.
