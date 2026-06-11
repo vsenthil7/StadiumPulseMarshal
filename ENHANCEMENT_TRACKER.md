@@ -1418,3 +1418,33 @@ All five modules are RBAC-guarded; enterprise routes live in
 ### Round 27 — COMPLETE (P6.M1, M3, M5, M7, M9)
 ### Still queued (continuing next): P2 Alembic, P4 Cloud Run/Dockerfile/deploy.sh,
 ### P6.M2 escalation, P6.M6 ChatOps, P6.M8 Davis feedback, P5.S5 k6 load, frontend pages.
+
+---
+
+## Round 28 — Playbook V02 P6 width modules (batch 2): M2, M4, M6, M8
+
+Continued straight through the playbook. Remaining backend width modules added,
+each wired into AppContext + main router registration and verified live:
+
+- **P6.M2 — Escalation deepening** (`services/escalation_engine.py`): added
+  `evaluate_pending_escalations(incidents, now_seconds)` for batch auto
+  re-escalation of open incidents past their step timeout (reuses existing
+  policy_for/evaluate). The `/incidents/{id}/escalate` endpoint already advances
+  tier. **+4 tests** (`pytest -k escalation` green).
+- **P6.M4 — SLO catalog** (`api/routes_slo_catalog.py`): GET /api/v1/slo-catalog
+  (list + service_id filter), GET /{id}, GET /{id}/burn-policy (per-tier trigger
+  error-rate from BURN_TIERS). RBAC SLO_READ. **+6 tests**; live: returns 2 SLOs.
+- **P6.M6 — ChatOps bridge** (`models/chatops.py`, `api/routes_chatops.py`):
+  POST /api/v1/chatops/slack/command — status / incident <id> / runbook <id>
+  [execute] / help. Parses urlencoded body directly (no python-multipart dep).
+  **+6 tests**; live: formatted Slack responses + runbook execute.
+- **P6.M8 — Davis AI feedback loop** (`services/davis_feedback_service.py`,
+  `api/routes_davis.py`): GET /davis/problems/{id}/analysis (delegates to DT
+  client else synthetic), POST /davis/feedback (REMEDIATION_APPROVE; rank ±1),
+  GET feedback + /ranked. **+4 tests**; live: rank 1.0→2.0 on repeated correct.
+
+Backend **491 pass** (+20); frontend tsc+build green; 7 node RBAC tests.
+
+### Round 28 — COMPLETE (P6.M2, M4, M6, M8) — all nine P6 modules now have backends
+### Still queued: P2 Alembic (persist width stores), P4 Cloud Run/Dockerfile/deploy.sh,
+### P5.S5 k6 load script, frontend pages for the new P6 modules.

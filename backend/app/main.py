@@ -92,6 +92,9 @@ def create_app() -> FastAPI:
     from app.api.routes_runbooks import router as runbooks_router
     from app.api.routes_postmortems import router as postmortems_router
     from app.api.routes_enterprise import router as enterprise_router
+    from app.api.routes_slo_catalog import router as slo_catalog_router
+    from app.api.routes_chatops import router as chatops_router
+    from app.api.routes_davis import router as davis_router
 
     app.include_router(incidents_router)
     app.include_router(ops_router)
@@ -105,6 +108,9 @@ def create_app() -> FastAPI:
     app.include_router(runbooks_router)
     app.include_router(postmortems_router)
     app.include_router(enterprise_router)
+    app.include_router(slo_catalog_router)
+    app.include_router(chatops_router)
+    app.include_router(davis_router)
 
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:

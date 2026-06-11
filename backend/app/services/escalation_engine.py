@@ -75,3 +75,25 @@ class EscalationEngine:
             engineer=engineer,
             channels=step.notify_channels,
         )
+
+    def evaluate_pending_escalations(
+        self, incidents: list[Incident], now_seconds: float | None = None,
+    ) -> list[tuple[Incident, EscalationDecision]]:
+        """Find open incidents that have breached their next step timeout and
+        should escalate to a higher tier. Returns (incident, decision) pairs.
+
+        Pure logic — the caller (incident service / a scheduler) performs the
+        actual tier bump + notification dispatch.
+        """
+        import time as _t
+
+        now = _t.time() if now_seconds is None else now_seconds
+        out: list[tuple[Incident, EscalationDecision]] = []
+        for incident in incidents:
+            if not incident.is_open:
+                continue
+            elapsed_minutes = (now - incident.created_at.timestamp()) / 60.0
+            decision = self.evaluate(incident, elapsed_minutes)
+            if decision.should_escalate:
+                out.append((incident, decision))
+        return out

@@ -51,6 +51,9 @@ class AppContext:
 
         self.cost_analytics = CostAnalyticsService()
         self.change_events = ChangeEventService()
+        from app.services.davis_feedback_service import DavisFeedbackService
+
+        self.davis = DavisFeedbackService()
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )
