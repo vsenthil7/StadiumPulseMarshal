@@ -17,14 +17,26 @@ def _id() -> str:
 class ChangeEventService:
     """In-memory change log with simple time-proximity incident correlation."""
 
-    def __init__(self, correlation_window_minutes: float = 60.0) -> None:
+    def __init__(self, correlation_window_minutes: float = 60.0,
+                 persistence=None) -> None:
         self._events: dict[str, ChangeEvent] = {}
         self._window = correlation_window_minutes
+        self._p = persistence
 
-    def record(self, event: ChangeEvent) -> ChangeEvent:
+    async def load(self) -> None:
+        if self._p is None:
+            return
+        for eid, doc in (await self._p.load()).items():
+            self._events[eid] = ChangeEvent(**doc)
+
+    async def record(self, event: ChangeEvent) -> ChangeEvent:
         if not event.id:
             event = event.model_copy(update={"id": _id()})
         self._events[event.id] = event
+        if self._p is not None:
+            await self._p.save(event.id, event.service_id,
+                               event.change_type.value, event.at.isoformat(),
+                               event.model_dump(mode="json"))
         log.info("Change event recorded: %s (%s)", event.id, event.title)
         return event
 
@@ -40,7 +52,7 @@ class ChangeEventService:
     def get(self, event_id: str) -> ChangeEvent | None:
         return self._events.get(event_id)
 
-    def link_incident(self, event_id: str, incident_id: str) -> ChangeEvent | None:
+    async def link_incident(self, event_id: str, incident_id: str) -> ChangeEvent | None:
         e = self._events.get(event_id)
         if e is None:
             return None
@@ -48,6 +60,9 @@ class ChangeEventService:
             e = e.model_copy(update={
                 "linked_incident_ids": [*e.linked_incident_ids, incident_id]})
             self._events[event_id] = e
+            if self._p is not None:
+                await self._p.save(e.id, e.service_id, e.change_type.value,
+                                   e.at.isoformat(), e.model_dump(mode="json"))
         return e
 
     def correlate(self, incident_time: datetime, service_id: str | None = None,

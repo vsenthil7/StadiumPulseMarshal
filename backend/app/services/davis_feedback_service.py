@@ -16,18 +16,26 @@ log = get_logger(__name__)
 
 
 class DavisFeedbackService:
-    def __init__(self) -> None:
+    def __init__(self, persistence=None) -> None:
         # problem_id → {"rank": float, "feedback": [ ... ]}
         self._state: dict[str, dict] = {}
+        self._p = persistence
 
-    def record_feedback(self, problem_id: str, correct: bool, actor: str,
-                        notes: str = "") -> dict:
+    async def load(self) -> None:
+        if self._p is None:
+            return
+        self._state.update(await self._p.load())
+
+    async def record_feedback(self, problem_id: str, correct: bool, actor: str,
+                              notes: str = "") -> dict:
         entry = self._state.setdefault(problem_id, {"rank": 0.0, "feedback": []})
         entry["rank"] = round(entry["rank"] + (1.0 if correct else -1.0), 3)
         entry["feedback"].append({
             "correct": correct, "actor": actor, "notes": notes,
             "at": datetime.now(timezone.utc).isoformat(),
         })
+        if self._p is not None:
+            await self._p.save(problem_id, entry["rank"], entry)
         log.info("Davis feedback for %s: correct=%s → rank=%s",
                  problem_id, correct, entry["rank"])
         return {"problem_id": problem_id, "rank": entry["rank"],

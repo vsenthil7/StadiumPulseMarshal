@@ -1517,3 +1517,34 @@ SPA serves.
 ### Reviewer-doc status: P1–P6 backends + infra (P2/P4/P5) + P6 frontend all DONE.
 ### Remaining (smaller): SQL-backing the width-module in-memory stores; live-cred
 ### integration tests; ChatOps Slack HMAC verification.
+
+---
+
+## Round 31 — SQL-backing the P6 width-module stores (durability)
+
+The width modules were in-memory/seeded; they are now durable when a SQL
+database is configured (unchanged in-memory behaviour without one):
+
+- **5 new ORM tables** (`app/repositories/sql/database.py`): runbooks,
+  runbook_executions, postmortems, change_events, davis_feedback (thin JSON
+  document rows, indexed by the fields each service filters on).
+- **SQL stores** (`app/repositories/sql/width_stores.py`): RunbookSqlStore,
+  PostmortemSqlStore, ChangeEventSqlStore, DavisFeedbackSqlStore — load-all on
+  startup, write-through (merge) on mutation.
+- **Services** gained an optional `persistence` dependency + `async load()`:
+  RunbookService, PostmortemService, ChangeEventService, DavisFeedbackService.
+  Mutating methods are now async write-through; their routes await them. Seed
+  runbooks are persisted on first boot so they're durable too.
+- **Context** injects the SQL stores only when `repos.database` exists; `startup()`
+  hydrates each service via `load()` after `repos.init()` (migrations run first).
+- **Alembic revision** `afc64362c147_width_module_tables` chains off the initial
+  schema and creates all 5 tables; `alembic upgrade head` builds the full
+  15-table schema.
+
+Backend **499 pass** (+5 persistence tests). Live-verified TRUE durability: a
+runbook + Davis feedback created in one process SURVIVE a full restart against
+the same DB. In-memory default path unchanged (DB-less tests still green).
+
+### Round 31 — COMPLETE
+### Remaining (smallest): ChatOps Slack HMAC verification; live-cred integration
+### tests for DT/PagerDuty/OpsGenie/Cloud Workflows + real Cloud Run deploy + k6 run.

@@ -93,6 +93,47 @@ class AuditLogRow(Base):
     document: Mapped[dict] = mapped_column(JSON)
 
 
+# ── P6 width-module tables (thin JSON documents, keyed by id) ────────────────
+class RunbookRow(Base):
+    __tablename__ = "runbooks"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    category: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class RunbookExecutionRow(Base):
+    __tablename__ = "runbook_executions"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    runbook_id: Mapped[str] = mapped_column(String, index=True)
+    started_at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class PostmortemRow(Base):
+    __tablename__ = "postmortems"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    status: Mapped[str] = mapped_column(String, index=True)
+    incident_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    created_at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class ChangeEventRow(Base):
+    __tablename__ = "change_events"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    service_id: Mapped[str] = mapped_column(String, index=True)
+    change_type: Mapped[str] = mapped_column(String, index=True)
+    at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class DavisFeedbackRow(Base):
+    __tablename__ = "davis_feedback"
+    problem_id: Mapped[str] = mapped_column(String, primary_key=True)
+    rank: Mapped[float] = mapped_column(Float, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class Database:
     """Holds the engine + session factory and creates tables on init."""
 

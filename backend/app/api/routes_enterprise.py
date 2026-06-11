@@ -52,7 +52,8 @@ async def record_change_event(
     principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> dict:
     ev = ChangeEvent(**body.model_dump(), actor=principal.subject)
-    return _ctx(request).change_events.record(ev).model_dump(mode="json")
+    ev = await _ctx(request).change_events.record(ev)
+    return ev.model_dump(mode="json")
 
 
 @router.post("/change-events/{event_id}/link/{incident_id}", tags=["enterprise"])
@@ -60,7 +61,7 @@ async def link_change_event(
     event_id: str, incident_id: str, request: Request,
     _p: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> dict:
-    ev = _ctx(request).change_events.link_incident(event_id, incident_id)
+    ev = await _ctx(request).change_events.link_incident(event_id, incident_id)
     if ev is None:
         raise HTTPException(status_code=404, detail="Change event not found")
     return ev.model_dump(mode="json")

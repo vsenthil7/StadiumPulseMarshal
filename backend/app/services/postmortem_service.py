@@ -1,4 +1,8 @@
-"""Postmortem workflow service: create/update/timeline/actions/export."""
+"""Postmortem workflow service: create/update/timeline/actions/export.
+
+Optional ``persistence`` (PostmortemSqlStore) makes records durable; without it
+the service is purely in-memory (default for mock/demo and DB-less tests).
+"""
 from __future__ import annotations
 
 import uuid
@@ -17,8 +21,21 @@ def _id() -> str:
 
 
 class PostmortemService:
-    def __init__(self) -> None:
+    def __init__(self, persistence=None) -> None:
         self._items: dict[str, Postmortem] = {}
+        self._p = persistence
+
+    async def load(self) -> None:
+        if self._p is None:
+            return
+        for pid, doc in (await self._p.load()).items():
+            self._items[pid] = Postmortem(**doc)
+
+    async def _persist(self, pm: Postmortem) -> None:
+        if self._p is not None:
+            await self._p.save(pm.id, pm.status.value, pm.incident_id,
+                               pm.created_at.isoformat(),
+                               pm.model_dump(mode="json"))
 
     def list(self, status: PostmortemStatus | None = None,
              incident_id: str | None = None) -> list[Postmortem]:
@@ -32,51 +49,53 @@ class PostmortemService:
     def get(self, pm_id: str) -> Postmortem | None:
         return self._items.get(pm_id)
 
-    def create(self, pm: Postmortem) -> Postmortem:
+    async def create(self, pm: Postmortem) -> Postmortem:
         if not pm.id:
             pm = pm.model_copy(update={"id": _id()})
         self._items[pm.id] = pm
+        await self._persist(pm)
         log.info("Postmortem created: %s", pm.id)
         return pm
 
-    def update(self, pm_id: str, patch: dict) -> Postmortem | None:
+    async def update(self, pm_id: str, patch: dict) -> Postmortem | None:
         pm = self._items.get(pm_id)
         if pm is None:
             return None
         updated = pm.model_copy(update={
             **patch, "updated_at": datetime.now(timezone.utc)})
         self._items[pm_id] = updated
+        await self._persist(updated)
         return updated
 
-    def add_timeline(self, pm_id: str, text: str, author: str,
-                     at: datetime | None = None) -> Postmortem | None:
+    async def add_timeline(self, pm_id: str, text: str, author: str,
+                           at: datetime | None = None) -> Postmortem | None:
         pm = self._items.get(pm_id)
         if pm is None:
             return None
         entry = TimelineEntry(at=at or datetime.now(timezone.utc),
                               text=text, author=author)
         timeline = sorted([*pm.timeline, entry], key=lambda e: e.at)
-        return self.update(pm_id, {"timeline": timeline})
+        return await self.update(pm_id, {"timeline": timeline})
 
-    def add_action(self, pm_id: str, description: str, owner: str = "",
-                   due: str | None = None) -> Postmortem | None:
+    async def add_action(self, pm_id: str, description: str, owner: str = "",
+                         due: str | None = None) -> Postmortem | None:
         pm = self._items.get(pm_id)
         if pm is None:
             return None
         action = ActionItem(id=f"AI-{uuid.uuid4().hex[:6]}",
                             description=description, owner=owner, due=due)
-        return self.update(pm_id, {"action_items": [*pm.action_items, action]})
+        return await self.update(pm_id, {"action_items": [*pm.action_items, action]})
 
-    def complete_action(self, pm_id: str, action_id: str) -> Postmortem | None:
+    async def complete_action(self, pm_id: str, action_id: str) -> Postmortem | None:
         pm = self._items.get(pm_id)
         if pm is None:
             return None
         items = [a.model_copy(update={"done": True}) if a.id == action_id else a
                  for a in pm.action_items]
-        return self.update(pm_id, {"action_items": items})
+        return await self.update(pm_id, {"action_items": items})
 
-    def publish(self, pm_id: str) -> Postmortem | None:
-        return self.update(pm_id, {"status": PostmortemStatus.PUBLISHED})
+    async def publish(self, pm_id: str) -> Postmortem | None:
+        return await self.update(pm_id, {"status": PostmortemStatus.PUBLISHED})
 
     def export_markdown(self, pm_id: str) -> str | None:
         pm = self._items.get(pm_id)

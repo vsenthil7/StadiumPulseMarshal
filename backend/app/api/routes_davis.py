@@ -46,7 +46,7 @@ async def record_feedback(
     principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
 ) -> dict:
     """Record SRE outcome feedback on a Davis problem; updates its rank."""
-    return _ctx(request).davis.record_feedback(
+    return await _ctx(request).davis.record_feedback(
         body.problem_id, body.correct, principal.subject, body.notes)
 
 

@@ -61,12 +61,29 @@ _SEED: list[dict] = [
 
 
 class RunbookService:
-    def __init__(self, dispatcher=None) -> None:
+    def __init__(self, dispatcher=None, persistence=None) -> None:
         self._runbooks: dict[str, Runbook] = {
             r["id"]: Runbook(**r) for r in _SEED
         }
         self._executions: dict[str, RunbookExecution] = {}
         self._dispatcher = dispatcher
+        self._p = persistence
+
+    async def load(self) -> None:
+        """Hydrate from durable storage when a persistence backend is set.
+        Seeded runbooks remain unless overridden by a stored row of the same id."""
+        if self._p is None:
+            return
+        stored = await self._p.load()
+        for rid, doc in stored.items():
+            self._runbooks[rid] = Runbook(**doc)
+        for doc in await self._p.load_executions():
+            ex = RunbookExecution(**doc)
+            self._executions[ex.id] = ex
+        # Persist seed rows that aren't yet stored, so first boot is durable.
+        for rid, rb in list(self._runbooks.items()):
+            if rid not in stored:
+                await self._p.save(rid, rb.category.value, rb.model_dump(mode="json"))
 
     def list_runbooks(self, category: RunbookCategory | None = None,
                       tag: str | None = None,
@@ -84,14 +101,17 @@ class RunbookService:
     def get_runbook(self, runbook_id: str) -> Runbook | None:
         return self._runbooks.get(runbook_id)
 
-    def create_runbook(self, runbook: Runbook) -> Runbook:
+    async def create_runbook(self, runbook: Runbook) -> Runbook:
         if not runbook.id:
             runbook = runbook.model_copy(update={"id": _id()})
         self._runbooks[runbook.id] = runbook
+        if self._p is not None:
+            await self._p.save(runbook.id, runbook.category.value,
+                               runbook.model_dump(mode="json"))
         log.info("Runbook created: %s (%s)", runbook.id, runbook.name)
         return runbook
 
-    def update_runbook(self, runbook_id: str, patch: dict) -> Runbook | None:
+    async def update_runbook(self, runbook_id: str, patch: dict) -> Runbook | None:
         rb = self._runbooks.get(runbook_id)
         if rb is None:
             return None
@@ -101,10 +121,16 @@ class RunbookService:
             "updated_at": datetime.now(timezone.utc),
         })
         self._runbooks[runbook_id] = updated
+        if self._p is not None:
+            await self._p.save(runbook_id, updated.category.value,
+                               updated.model_dump(mode="json"))
         return updated
 
-    def delete_runbook(self, runbook_id: str) -> bool:
-        return self._runbooks.pop(runbook_id, None) is not None
+    async def delete_runbook(self, runbook_id: str) -> bool:
+        existed = self._runbooks.pop(runbook_id, None) is not None
+        if existed and self._p is not None:
+            await self._p.delete(runbook_id)
+        return existed
 
     async def execute_runbook(self, runbook_id: str, actor: str,
                               incident_id: str | None = None) -> RunbookExecution | None:
@@ -138,6 +164,10 @@ class RunbookService:
             "dispatch_result": dispatch_result,
         })
         self._executions[ex.id] = ex
+        if self._p is not None:
+            await self._p.save_execution(
+                ex.id, runbook_id, ex.started_at.isoformat(),
+                ex.model_dump(mode="json"))
         log.info("Runbook executed: %s by %s", runbook_id, actor)
         return ex
 

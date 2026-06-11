@@ -62,7 +62,8 @@ async def create_postmortem(
     principal: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
     pm = Postmortem(**body.model_dump(), created_by=principal.subject)
-    return _ctx(request).postmortems.create(pm).model_dump(mode="json")
+    pm = await _ctx(request).postmortems.create(pm)
+    return pm.model_dump(mode="json")
 
 
 @router.patch("/postmortems/{pm_id}", tags=["postmortems"])
@@ -70,7 +71,7 @@ async def update_postmortem(
     pm_id: str, patch: dict, request: Request,
     _p: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
-    pm = _ctx(request).postmortems.update(pm_id, patch)
+    pm = await _ctx(request).postmortems.update(pm_id, patch)
     if pm is None:
         raise HTTPException(status_code=404, detail="Postmortem not found")
     return pm.model_dump(mode="json")
@@ -81,7 +82,7 @@ async def add_timeline(
     pm_id: str, body: TimelineBody, request: Request,
     principal: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
-    pm = _ctx(request).postmortems.add_timeline(pm_id, body.text, principal.subject)
+    pm = await _ctx(request).postmortems.add_timeline(pm_id, body.text, principal.subject)
     if pm is None:
         raise HTTPException(status_code=404, detail="Postmortem not found")
     return pm.model_dump(mode="json")
@@ -92,7 +93,7 @@ async def add_action(
     pm_id: str, body: ActionBody, request: Request,
     _p: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
-    pm = _ctx(request).postmortems.add_action(pm_id, body.description, body.owner, body.due)
+    pm = await _ctx(request).postmortems.add_action(pm_id, body.description, body.owner, body.due)
     if pm is None:
         raise HTTPException(status_code=404, detail="Postmortem not found")
     return pm.model_dump(mode="json")
@@ -103,7 +104,7 @@ async def complete_action(
     pm_id: str, action_id: str, request: Request,
     _p: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
-    pm = _ctx(request).postmortems.complete_action(pm_id, action_id)
+    pm = await _ctx(request).postmortems.complete_action(pm_id, action_id)
     if pm is None:
         raise HTTPException(status_code=404, detail="Postmortem or action not found")
     return pm.model_dump(mode="json")
@@ -114,7 +115,7 @@ async def publish_postmortem(
     pm_id: str, request: Request,
     _p: Principal = Depends(require_permission(Permission.POSTMORTEM_WRITE)),
 ) -> dict:
-    pm = _ctx(request).postmortems.publish(pm_id)
+    pm = await _ctx(request).postmortems.publish(pm_id)
     if pm is None:
         raise HTTPException(status_code=404, detail="Postmortem not found")
     return pm.model_dump(mode="json")

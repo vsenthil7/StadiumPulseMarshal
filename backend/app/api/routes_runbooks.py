@@ -57,7 +57,7 @@ async def create_runbook(
     principal: Principal = Depends(require_permission(Permission.RUNBOOK_WRITE)),
 ) -> dict:
     rb = Runbook(**body.model_dump(), created_by=principal.subject)
-    created = _ctx(request).runbooks.create_runbook(rb)
+    created = await _ctx(request).runbooks.create_runbook(rb)
     return created.model_dump(mode="json")
 
 
@@ -66,7 +66,7 @@ async def update_runbook(
     runbook_id: str, patch: dict, request: Request,
     _p: Principal = Depends(require_permission(Permission.RUNBOOK_WRITE)),
 ) -> dict:
-    updated = _ctx(request).runbooks.update_runbook(runbook_id, patch)
+    updated = await _ctx(request).runbooks.update_runbook(runbook_id, patch)
     if updated is None:
         raise HTTPException(status_code=404, detail="Runbook not found")
     return updated.model_dump(mode="json")
@@ -77,7 +77,7 @@ async def delete_runbook(
     runbook_id: str, request: Request,
     _p: Principal = Depends(require_permission(Permission.RUNBOOK_WRITE)),
 ) -> dict:
-    ok = _ctx(request).runbooks.delete_runbook(runbook_id)
+    ok = await _ctx(request).runbooks.delete_runbook(runbook_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Runbook not found")
     return {"deleted": True, "id": runbook_id}

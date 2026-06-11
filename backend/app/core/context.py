@@ -40,20 +40,34 @@ class AppContext:
         self.alert_router = build_alert_router(self.settings)
         self.remediation_dispatcher = build_remediation_dispatcher(self.settings)
         self.notifications.set_alert_router(self.alert_router)
+        # P6 width-module persistence: durable when a SQL database is configured.
+        _db = getattr(self.repos, "database", None)
+        _rb_p = _pm_p = _ce_p = _dv_p = None
+        if _db is not None:
+            from app.repositories.sql.width_stores import (
+                ChangeEventSqlStore, DavisFeedbackSqlStore,
+                PostmortemSqlStore, RunbookSqlStore,
+            )
+
+            _rb_p = RunbookSqlStore(_db)
+            _pm_p = PostmortemSqlStore(_db)
+            _ce_p = ChangeEventSqlStore(_db)
+            _dv_p = DavisFeedbackSqlStore(_db)
         from app.services.runbook_service import RunbookService
 
-        self.runbooks = RunbookService(dispatcher=self.remediation_dispatcher)
+        self.runbooks = RunbookService(
+            dispatcher=self.remediation_dispatcher, persistence=_rb_p)
         from app.services.postmortem_service import PostmortemService
 
-        self.postmortems = PostmortemService()
+        self.postmortems = PostmortemService(persistence=_pm_p)
         from app.services.cost_analytics_service import CostAnalyticsService
         from app.services.change_event_service import ChangeEventService
 
         self.cost_analytics = CostAnalyticsService()
-        self.change_events = ChangeEventService()
+        self.change_events = ChangeEventService(persistence=_ce_p)
         from app.services.davis_feedback_service import DavisFeedbackService
 
-        self.davis = DavisFeedbackService()
+        self.davis = DavisFeedbackService(persistence=_dv_p)
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )
@@ -407,6 +421,17 @@ class AppContext:
         if problems:
             raise ConfigurationError("; ".join(problems))
         await self.repos.init()
+        # Hydrate P6 width modules from durable storage (no-op when in-memory).
+        for _svc in (self.runbooks, self.postmortems, self.change_events, self.davis):
+            _load = getattr(_svc, "load", None)
+            if _load is not None:
+                try:
+                    await _load()
+                except Exception as exc:  # noqa: BLE001
+                    from app.core.logging import get_logger
+                    get_logger(__name__).warning(
+                        "width-module load failed for %s: %s",
+                        type(_svc).__name__, exc)
         self.relay.start()
         self.prune_scheduler.start()
         if self.settings.burn_digest_enabled:
