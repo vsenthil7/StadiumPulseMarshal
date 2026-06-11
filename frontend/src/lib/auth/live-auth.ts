@@ -16,7 +16,10 @@ interface LiveUser {
   all_venues?: boolean;
 }
 
-function sessionFromLive(email: string, token: string | null, u: LiveUser): Session {
+function sessionFromLive(
+  email: string, token: string | null, u: LiveUser,
+  refreshToken: string | null = null,
+): Session {
   const vid = u.venue_id ?? DEMO_VENUES[0].id;
   const du = DEMO_USERS.find((d) => d.email.toLowerCase() === email.toLowerCase());
   const venues = u.all_venues
@@ -35,6 +38,7 @@ function sessionFromLive(email: string, token: string | null, u: LiveUser): Sess
       allVenues: !!u.all_venues,
     },
     token,
+    refreshToken,
     source: 'live',
     venues,
     activeVenueId: vid,
@@ -61,7 +65,9 @@ export async function liveLogin(
     return { error: detail };
   }
   const data = await r.json();
-  return { session: sessionFromLive(email, data.token ?? null, data.user) };
+  return {
+    session: sessionFromLive(email, data.token ?? null, data.user, data.refresh_token ?? null),
+  };
 }
 
 /** Rehydrate a session from a stored token via /auth/me. */
@@ -78,17 +84,42 @@ export async function liveMe(token: string): Promise<Session | null> {
   }
 }
 
-/** Exchange a still-valid token for a fresh one (silent refresh). */
-export async function liveRefresh(token: string): Promise<string | null> {
+/**
+ * Rotate the session via the refresh token (preferred) or, lacking one, re-mint
+ * from the access token. Returns the new access + refresh tokens, or null if
+ * the refresh was rejected (expired/revoked/reuse) so the caller can sign out.
+ */
+export async function liveRefresh(
+  token: string | null, refreshToken?: string | null,
+): Promise<{ token: string; refreshToken: string | null } | null> {
   try {
     const r = await fetch(`${BASE}/auth/refresh`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
     });
     if (!r.ok) return null;
     const data = await r.json();
-    return data.token ?? null;
+    if (!data.token) return null;
+    return { token: data.token, refreshToken: data.refresh_token ?? null };
   } catch {
     return null;
+  }
+}
+
+/** Revoke the refresh-token family on the server (best-effort). */
+export async function liveLogout(refreshToken?: string | null): Promise<void> {
+  if (!refreshToken) return;
+  try {
+    await fetch(`${BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } catch {
+    /* best-effort */
   }
 }

@@ -72,7 +72,22 @@ class AppContext:
         from app.services.slo_history import SLOHistory
 
         self.slo_history = SLOHistory()
+        from app.services.entity_venue import EntityVenueResolver
+
+        self.entity_venue = EntityVenueResolver()
+        from app.services.refresh_store import RefreshStore
+
+        self.refresh_tokens = RefreshStore()
         self.current_scenario = self._initial_scenario()
+
+    async def ensure_entity_venue_map(self) -> None:
+        """Populate the entity→venue resolver lazily from the active client."""
+        if not self.entity_venue.loaded:
+            try:
+                entities = await self.client.list_entities()
+                self.entity_venue.load(entities)
+            except Exception:  # pragma: no cover - defensive
+                self.entity_venue.load([])
 
     def _initial_scenario(self) -> str:
         # Mock client exposes the scenario; live clients have none.
@@ -94,6 +109,7 @@ class AppContext:
             self.client.set_scenario(key)  # type: ignore[attr-defined]
             self.current_scenario = key
             self.slo_engine = SLOEngine(self._collect_slos())
+            self.entity_venue.invalidate()
 
     async def evaluate_slos(self):
         """Compute current error budgets from synthetic/live measurements."""
@@ -104,11 +120,36 @@ class AppContext:
         self.slo_history.record(budgets)
         return budgets
 
-    async def analytics(self) -> AnalyticsSummary:
+    async def analytics(
+        self, principal_venues: list[str] | None = None,
+        venue_filter: str | None = None,
+    ) -> AnalyticsSummary:
+        """Compute analytics, optionally scoped to a venue or a principal's
+        venues. ``principal_venues=None`` means cross-venue (no restriction)."""
+        await self.ensure_entity_venue_map()
         incidents = await self.repos.incidents.list(limit=1000)
         budgets = await self.repos.slo.list_budgets()
         if not budgets:
             budgets = await self.evaluate_slos()
+
+        # Determine the allowed venue set.
+        allowed: set[str] | None
+        if venue_filter is not None:
+            allowed = {venue_filter}
+        elif principal_venues is not None:
+            allowed = set(principal_venues)
+        else:
+            allowed = None  # cross-venue
+
+        if allowed is not None:
+            incidents = [
+                i for i in incidents
+                if i.venue_id is None or i.venue_id in allowed
+            ]
+            slo_entity = {s.id: s.service_id for s in self.slo_engine.slos}
+            def _bv(b):
+                return self.entity_venue.venue_for(slo_entity.get(b.slo_id))
+            budgets = [b for b in budgets if _bv(b) is None or _bv(b) in allowed]
         return compute_summary(incidents, budgets)
 
     async def startup(self) -> None:

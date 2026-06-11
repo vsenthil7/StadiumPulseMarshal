@@ -17,6 +17,7 @@ export type AuthSource = 'live' | 'seed';
 export interface Session {
   user: SessionUser;
   token: string | null;
+  refreshToken?: string | null;
   source: AuthSource;
   venues: DemoVenue[];
   activeVenueId: string;

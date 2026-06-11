@@ -11,12 +11,13 @@ token shape and role claim stay the same.
 """
 from __future__ import annotations
 
+import secrets
 import time
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from app.api.auth import get_principal
+from app.api.auth import get_principal, optional_principal as _optional_principal_dep
 from app.core.errors import UnauthorizedError
 from app.rbac.policy import Principal
 
@@ -54,6 +55,38 @@ class LoginIn(BaseModel):
     password: str
 
 
+class RefreshIn(BaseModel):
+    refresh_token: str | None = None
+
+
+class LogoutIn(BaseModel):
+    refresh_token: str | None = None
+
+
+def _mint_access_for_subject(request: Request, subject: str) -> str | None:
+    """Mint an access JWT for a known subject (demo directory aware)."""
+    if _jwt is None:
+        return None
+    settings = request.app.state.ctx.settings
+    now = int(time.time())
+    jti = secrets.token_urlsafe(8)
+    user = DEMO_USERS.get(subject)
+    if user is not None:
+        payload = {
+            "sub": subject,
+            settings.jwt_roles_claim: [user["role"]],
+            "venue_id": user["venue_id"],
+            "all_venues": bool(user.get("all_venues")),
+            "name": user["name"],
+            "iat": now,
+            "exp": now + 8 * 3600,
+            "jti": jti,
+        }
+    else:
+        payload = {"sub": subject, "iat": now, "exp": now + 8 * 3600, "jti": jti}
+    return _jwt.encode(payload, _secret(request), algorithm="HS256")
+
+
 def _secret(request: Request) -> str:
     configured = request.app.state.ctx.settings.jwt_secret
     return configured or _DEMO_SECRET
@@ -82,8 +115,14 @@ async def login(body: LoginIn, request: Request) -> dict:
     if _jwt is not None:
         token = _jwt.encode(payload, _secret(request), algorithm="HS256")
 
+    # Start a refresh-token family for silent renewal with rotation.
+    refresh_token, _family = request.app.state.ctx.refresh_tokens.issue(
+        body.email.lower()
+    )
+
     return {
         "token": token,
+        "refresh_token": refresh_token,
         "user": _user_view(body.email.lower(), user),
     }
 
@@ -128,35 +167,57 @@ async def me(
 @router.post("/refresh")
 async def refresh(
     request: Request,
-    principal: Principal = Depends(get_principal),
+    body: RefreshIn = RefreshIn(),
+    principal: "Principal | None" = Depends(_optional_principal_dep),
 ) -> dict:
-    """Issue a fresh session token from a currently-valid one.
+    """Renew a session, preferring refresh-token rotation.
 
-    Lets the SPA renew before expiry (silent refresh) without forcing the user
-    to sign in again. Requires a valid presented token — an expired or invalid
-    token resolves to 401 via ``get_principal`` (when auth is enabled), so this
-    cannot be used to resurrect a dead session. The new token carries the same
-    subject, roles and venue scope as the current principal.
+    If a ``refresh_token`` is supplied it is rotated: the presented token is
+    consumed and a new one is issued in the same family. Presenting an
+    already-rotated token is treated as theft — the whole family is revoked and
+    the call is rejected (401). A fresh access token is returned alongside the
+    rotated refresh token.
+
+    With no ``refresh_token`` it falls back to re-minting from a still-valid
+    bearer access token (used when refresh tokens aren't tracked).
     """
-    if _jwt is None:
+    from app.services.refresh_store import ReuseError
+
+    store = request.app.state.ctx.refresh_tokens
+
+    if body.refresh_token:
+        subject = store.subject_for(body.refresh_token)
+        try:
+            rotated = store.rotate(body.refresh_token)
+        except ReuseError as exc:
+            raise UnauthorizedError(
+                "Refresh token reuse detected; session revoked"
+            ) from exc
+        if rotated is None or subject is None:
+            raise UnauthorizedError("Invalid or expired refresh token")
+        new_refresh, _fam = rotated
+        access = _mint_access_for_subject(request, subject)
+        return {
+            "token": access,
+            "refresh_token": new_refresh,
+            "expires_in": 8 * 3600,
+        }
+
+    # Fallback: bearer re-mint (requires a valid access token).
+    if principal is None:
+        raise UnauthorizedError("Authentication required")
+    access = _mint_access_for_subject(request, principal.subject)
+    if access is None:
         return {"token": None}
-    settings = request.app.state.ctx.settings
-    now = int(time.time())
-    payload = {
-        "sub": principal.subject,
-        settings.jwt_roles_claim: [r.value for r in principal.roles],
-        "venues": principal.venues,
-        "all_venues": principal.all_venues,
-        "iat": now,
-        "exp": now + 8 * 3600,
-    }
-    # Preserve a friendly name/venue when the subject is a known demo user.
-    user = DEMO_USERS.get(principal.subject)
-    if user is not None:
-        payload["name"] = user["name"]
-        payload["venue_id"] = user["venue_id"]
-    token = _jwt.encode(payload, _secret(request), algorithm="HS256")
-    return {"token": token, "expires_in": 8 * 3600}
+    return {"token": access, "expires_in": 8 * 3600}
+
+
+@router.post("/logout")
+async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
+    """Revoke the active refresh-token family so it cannot be rotated again."""
+    if body.refresh_token:
+        request.app.state.ctx.refresh_tokens.revoke_token(body.refresh_token)
+    return {"ok": True}
 
 
 @router.get("/demo-users")

@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.api.auth import require_permission, scope_collection
+from app.api.auth import require_permission, require_venue_access, scope_collection
 from app.api.schemas_ext import IncidentListResponse, Page
 from app.core.context import AppContext
 from app.core.errors import NotFoundError
@@ -43,12 +43,24 @@ class BulkTransitionResponse(BaseModel):
 @router.get("/slo/trends", response_model=SLOTrendResponse, tags=["slo"])
 async def slo_trends(
     request: Request,
-    _p=Depends(require_permission(Permission.SLO_READ)),
+    venue_id: str | None = None,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> SLOTrendResponse:
     ctx = _ctx(request)
+    await ctx.ensure_entity_venue_map()
     # Ensure at least one sample exists.
     await ctx.evaluate_slos()
-    return SLOTrendResponse(trends=ctx.slo_history.all_trends())
+    trends = ctx.slo_history.all_trends()
+    slo_entity = {s.id: s.service_id for s in ctx.slo_engine.slos}
+    def _venue_of(t):
+        return ctx.entity_venue.venue_for(slo_entity.get(t.slo_id))
+    if venue_id is not None:
+        require_venue_access(principal, venue_id)
+        trends = [t for t in trends if _venue_of(t) in (None, venue_id)]
+    elif not principal.all_venues:
+        allowed = set(principal.venues)
+        trends = [t for t in trends if _venue_of(t) is None or _venue_of(t) in allowed]
+    return SLOTrendResponse(trends=trends)
 
 
 @router.get(

@@ -250,3 +250,59 @@ session token with no renewal. Round 5 addresses both.
   RBAC unit tests pass. Docs + package.
 
 ### Round 5 — COMPLETE
+
+---
+
+## Round 6 — Entity→venue mapping (SLO/analytics partition) + OIDC refresh-token rotation
+
+Both tracks, full scope.
+
+### Track A — venue partition the entity-keyed domains
+| # | Sprint | Status |
+|---|--------|--------|
+| V1 | Entity model gains venue_id; scenario entities tagged to demo venues | 🟢 |
+| V2 | Entity→venue resolver service (entity_id → venue_id), cached | 🟢 |
+| V3 | /entities, /slo, /slo/trends venue-scoped via resolver | 🟢 |
+| V4 | Analytics: per-venue SLO/incident rollup; scope to principal | 🟢 |
+| V5 | Tests: cross-venue 403 / scoped results on entities, slo, analytics | 🟢 |
+
+### Track B — OIDC refresh-token rotation + revocation
+| # | Sprint | Status |
+|---|--------|--------|
+| W1 | RefreshToken store (issue, rotate, revoke, family reuse-detection) | 🟢 |
+| W2 | /auth/refresh returns rotating refresh token; old one invalidated | 🟢 |
+| W3 | Reuse detection: replay of a rotated token revokes the family (theft) | 🟢 |
+| W4 | /auth/logout revokes the active refresh family | 🟢 |
+| W5 | Frontend: store+rotate refresh token; refresh via it; logout revokes | 🟢 |
+| W6 | Tests: rotation, reuse-revocation, logout-revoke, expiry | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| X1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| X2 | Docs + package | 🟢 |
+
+### Round 6 changelog
+- **Track A — entity→venue mapping (V1–V5):** `Entity` gained `venue_id`;
+  scenario entities tagged to demo venues. New `EntityVenueResolver`
+  (entity_id→venue_id, cached, invalidated on scenario switch) in the app
+  context. `/entities`, `/slo`, `/slo/trends`, `/analytics` now venue-scoped via
+  the resolver (incidents + SLO rollups filtered; cross-venue filter → 403).
+  +5 tests. Live-verified: Olympic operator sees 0 of the Arena SLOs, 403 on a
+  cross-venue entities filter; platform sees all.
+- **Track B — OIDC refresh-token rotation (W1–W6):** new `RefreshStore`
+  implementing the rotation pattern — token families, rotation on every
+  refresh, **reuse-detection that revokes the whole family on replay (theft
+  signal)**, revocation on logout. `/auth/login` issues a refresh token;
+  `/auth/refresh` rotates (reuse → 401); new `/auth/logout` revokes. Unique
+  `jti` per access token so re-mints differ. `optional_principal` dependency
+  supports both refresh-token and bearer paths. +14 tests (store unit +
+  endpoint). Live-verified: replaying a rotated token 401s and kills the family.
+- **Frontend (W5):** session carries the refresh token; silent refresh rotates
+  it every 30m and signs out if rotation is rejected (revoked/expired/theft);
+  logout revokes the family server-side.
+- **X1:** backend **269 pass**; frontend `tsc -b` + `vite build` green; 7 node
+  RBAC unit tests pass.
+- **X2:** docs + package.
+
+### Round 6 — COMPLETE

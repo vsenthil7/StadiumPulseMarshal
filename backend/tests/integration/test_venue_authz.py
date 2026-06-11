@@ -211,3 +211,78 @@ def test_problems_explicit_venue_filter_authorized():
         # own venue → 200
         assert c.get("/api/v1/problems?venue_id=venue_arena_north",
                      headers=h).status_code == 200
+
+
+# ── Round 6 Track A: entity / SLO / analytics venue scoping ─────────────────
+def test_entities_scoped_to_principal_venue():
+    with _client() as c:
+        op = _login(c, "operator@arena-north.demo")["token"]
+        ents = c.get("/api/v1/entities",
+                     headers={"Authorization": f"Bearer {op}"}).json()["entities"]
+        venues = {e.get("venue_id") for e in ents}
+        # Arena North operator should not see the Olympic Park fan-app entity.
+        assert "venue_olympic_park" not in venues
+        assert "venue_arena_north" in venues
+
+        op2 = _login(c, "operator@olympic-park.demo")["token"]
+        ents2 = c.get("/api/v1/entities",
+                      headers={"Authorization": f"Bearer {op2}"}).json()["entities"]
+        v2 = {e.get("venue_id") for e in ents2}
+        assert v2 <= {"venue_olympic_park"}
+
+
+def test_entities_explicit_cross_venue_filter_403():
+    with _client() as c:
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        assert c.get("/api/v1/entities?venue_id=venue_olympic_park",
+                     headers=h).status_code == 403
+        assert c.get("/api/v1/entities?venue_id=venue_arena_north",
+                     headers=h).status_code == 200
+
+
+def test_slo_budgets_scoped_by_venue():
+    with _client() as c:
+        # All SLOs in the payment scenario are on Arena North entities, so an
+        # Olympic Park operator should see none of them.
+        op_ol = _login(c, "operator@olympic-park.demo")["token"]
+        budgets_ol = c.get("/api/v1/slo",
+                           headers={"Authorization": f"Bearer {op_ol}"}).json()["budgets"]
+        assert budgets_ol == []
+        # Arena North operator sees the payment SLOs.
+        op_an = _login(c, "operator@arena-north.demo")["token"]
+        budgets_an = c.get("/api/v1/slo",
+                           headers={"Authorization": f"Bearer {op_an}"}).json()["budgets"]
+        assert len(budgets_an) >= 1
+        # Platform sees all.
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        budgets_all = c.get("/api/v1/slo",
+                            headers={"Authorization": f"Bearer {sre}"}).json()["budgets"]
+        assert len(budgets_all) >= len(budgets_an)
+
+
+def test_slo_explicit_cross_venue_403():
+    with _client() as c:
+        op = _login(c, "operator@arena-north.demo")["token"]
+        assert c.get("/api/v1/slo?venue_id=venue_olympic_park",
+                     headers={"Authorization": f"Bearer {op}"}).status_code == 403
+
+
+def test_analytics_scoped_incidents_by_venue():
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        hs = {"Authorization": f"Bearer {sre}"}
+        # create one incident in each venue
+        for vid in ("venue_arena_north", "venue_olympic_park"):
+            probs = c.get(f"/api/v1/problems?venue_id={vid}", headers=hs).json()["problems"]
+            if probs:
+                c.post("/api/v1/incidents",
+                       json={"problem_id": probs[0]["id"], "venue_id": vid}, headers=hs)
+        # platform analytics sees both venues
+        allsum = c.get("/api/v1/analytics", headers=hs).json()["summary"]
+        assert allsum["total_incidents"] >= 2
+        # arena-north operator analytics only counts its venue
+        op = _login(c, "operator@arena-north.demo")["token"]
+        an = c.get("/api/v1/analytics",
+                   headers={"Authorization": f"Bearer {op}"}).json()["summary"]
+        assert set(an["by_venue"].keys()) <= {"venue_arena_north"}

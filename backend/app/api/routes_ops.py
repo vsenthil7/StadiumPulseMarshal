@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from app.api.auth import require_permission
-from app.rbac.policy import Permission
+from app.api.auth import require_permission, require_venue_access
+from app.rbac.policy import Permission, Principal
 from app.api.schemas_ext import (
     AnalyticsResponse,
     NotificationListResponse,
@@ -25,19 +25,39 @@ def _ctx(request: Request) -> AppContext:
 
 @router.get("/slo", response_model=SLOListResponse, tags=["slo"])
 async def list_slo_budgets(
-    request: Request, _p=Depends(require_permission(Permission.SLO_READ))
+    request: Request, venue_id: str | None = None,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> SLOListResponse:
     ctx = _ctx(request)
+    await ctx.ensure_entity_venue_map()
     budgets = await ctx.evaluate_slos()
+    if venue_id is not None:
+        require_venue_access(principal, venue_id)
+    # Map slo_id → owning entity → venue, then keep budgets the caller may see.
+    slo_entity = {s.id: s.service_id for s in ctx.slo_engine.slos}
+    def _venue_of(budget) -> str | None:
+        return ctx.entity_venue.venue_for(slo_entity.get(budget.slo_id))
+    if venue_id is not None:
+        budgets = [b for b in budgets if _venue_of(b) in (None, venue_id)]
+    elif not principal.all_venues:
+        allowed = set(principal.venues)
+        budgets = [b for b in budgets
+                   if (_venue_of(b) is None) or (_venue_of(b) in allowed)]
     return SLOListResponse(budgets=budgets)
 
 
 @router.get("/analytics", response_model=AnalyticsResponse, tags=["analytics"])
 async def get_analytics(
-    request: Request, _p=Depends(require_permission(Permission.ANALYTICS_READ))
+    request: Request, venue_id: str | None = None,
+    principal: Principal = Depends(require_permission(Permission.ANALYTICS_READ)),
 ) -> AnalyticsResponse:
     ctx = _ctx(request)
-    return AnalyticsResponse(summary=await ctx.analytics())
+    if venue_id is not None:
+        require_venue_access(principal, venue_id)
+    return AnalyticsResponse(summary=await ctx.analytics(
+        principal_venues=None if principal.all_venues else principal.venues,
+        venue_filter=venue_id,
+    ))
 
 
 @router.get(

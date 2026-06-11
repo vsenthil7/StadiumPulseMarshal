@@ -244,3 +244,38 @@ bounced to the login screen mid-incident.
 ### Tests
 Backend **257 pass** (+13 this round). Frontend `tsc -b` + `vite build` green;
 7 node RBAC unit tests pass.
+
+---
+
+## Round 6 — Entity→venue partitioning + OIDC refresh-token rotation
+
+### Entity-keyed domains are now venue-partitioned
+SLO budgets, SLO trends, entities and analytics are keyed by *entity*, not
+venue. `Entity` now carries `venue_id`, and an `EntityVenueResolver`
+(entity_id → venue_id, cached, rebuilt on scenario change) lets those domains be
+scoped:
+- `/entities` returns only the caller's venues' entities;
+- `/slo` and `/slo/trends` return only budgets/trends for entities in the
+  caller's venues;
+- `/analytics` filters incidents and SLO rollups to the caller's venues;
+- explicit cross-venue `?venue_id=` filters are **403**.
+
+Verified live: an Olympic Park operator sees none of the (Arena North) payment
+SLOs and is 403 on a cross-venue entities filter; a platform principal sees all.
+
+### OIDC refresh-token rotation with theft detection
+Round 5 added a simple re-mint. Round 6 implements the full OAuth2 rotation
+pattern via a `RefreshStore`:
+- login starts a refresh-token **family**;
+- each `/auth/refresh` consumes the presented token and issues a new one in the
+  same family (rotation), returning a fresh access token (unique `jti`) too;
+- presenting an already-rotated token is treated as **theft** — the whole
+  family is revoked and the call is 401;
+- `/auth/logout` revokes the active family.
+
+The SPA stores the refresh token, rotates it on the 30-minute silent-refresh
+tick, signs out if a rotation is rejected, and revokes the family on logout.
+
+### Tests
+Backend **269 pass** (+12 this round: entity/SLO/analytics scoping + refresh
+rotation/reuse/logout). Frontend `tsc -b` + `vite build` green.

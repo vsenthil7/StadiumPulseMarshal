@@ -16,7 +16,7 @@ import { setAuthToken, setClientUnauthorizedHandler } from '../../api/client';
 import { setHttpAuthToken, setUnauthorizedHandler } from '../../api/http';
 import { persistSession, restoreSession } from './session-store';
 import { seedLogin } from './seed-auth';
-import { liveLogin, liveMe, liveRefresh } from './live-auth';
+import { liveLogin, liveMe, liveRefresh, liveLogout } from './live-auth';
 import type { AuthSource, LoginResult, Session } from './types';
 
 export type { SessionUser, AuthSource, Session, LoginResult } from './types';
@@ -66,25 +66,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clear]);
 
-  // Silent token refresh: for a live session, renew the token periodically so
-  // long-lived sessions don't expire mid-use. (8h token; refresh every 30m.)
+  // Silent token refresh: for a live session, rotate the token periodically so
+  // long-lived sessions don't expire mid-use. Uses the rotating refresh token
+  // when present; a rejected refresh (expired/revoked/reuse) signs the user out.
   useEffect(() => {
     if (session?.source !== 'live' || !session.token) return;
     const id = window.setInterval(async () => {
       const current = session.token;
+      const currentRefresh = session.refreshToken;
       if (!current) return;
-      const fresh = await liveRefresh(current);
-      if (fresh) {
+      const result = await liveRefresh(current, currentRefresh);
+      if (result) {
         setSession((prev) => {
           if (!prev) return prev;
-          const next = { ...prev, token: fresh };
+          const next = {
+            ...prev,
+            token: result.token,
+            refreshToken: result.refreshToken ?? prev.refreshToken,
+          };
           persistSession(next);
           return next;
         });
+      } else if (currentRefresh) {
+        // A tracked refresh token that fails to rotate means the session is
+        // no longer valid (revoked/expired/theft) — sign out.
+        clear();
       }
     }, 30 * 60 * 1000);
     return () => window.clearInterval(id);
-  }, [session?.source, session?.token]);
+  }, [session?.source, session?.token, session?.refreshToken, clear]);
 
   // On mount: handle an OIDC callback token in the URL fragment, else if we
   // restored a live session verify/rehydrate it via /auth/me.
@@ -143,8 +153,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    const rt = session?.refreshToken;
     clear();
-  }, [clear]);
+    // Best-effort server-side revocation of the refresh-token family.
+    if (rt) void liveLogout(rt);
+  }, [clear, session]);
 
   const switchVenue = useCallback((venueId: string) => {
     setSession((prev) => {

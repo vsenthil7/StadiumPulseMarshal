@@ -122,6 +122,20 @@ async def get_principal(
     raise UnauthorizedError("Authentication required")
 
 
+async def optional_principal(
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> Principal | None:
+    """Like ``get_principal`` but returns ``None`` instead of raising when no
+    valid credential is present. For endpoints that accept either a refresh
+    token or a bearer access token."""
+    try:
+        return await get_principal(request, x_api_key, authorization)
+    except UnauthorizedError:
+        return None
+
+
 def require_permission(permission: Permission) -> Callable:
     """Dependency factory enforcing a permission on the resolved principal."""
 

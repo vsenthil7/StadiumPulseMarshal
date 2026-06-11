@@ -82,9 +82,14 @@ async def get_problem(
 
 
 @router.get("/entities", response_model=EntityList, tags=["observability"])
-async def list_entities(request: Request) -> EntityList:
+async def list_entities(
+    request: Request, venue_id: str | None = None,
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
+) -> EntityList:
     ctx = _ctx(request)
-    return EntityList(entities=await ctx.client.list_entities())
+    entities = await ctx.client.list_entities()
+    entities = scope_collection(principal, entities, venue_id)
+    return EntityList(entities=entities)
 
 
 @router.get("/timeline", response_model=TimelineResponse, tags=["observability"])

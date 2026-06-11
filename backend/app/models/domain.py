@@ -31,6 +31,7 @@ class Entity(BaseModel):
     type: EntityType
     tags: list[str] = Field(default_factory=list)
     health: float = Field(default=100.0, ge=0.0, le=100.0)
+    venue_id: str | None = None
 
 
 class MetricPoint(BaseModel):
