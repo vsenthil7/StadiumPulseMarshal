@@ -92,6 +92,7 @@ class Problem(BaseModel):
     events: list[Event] = Field(default_factory=list)
     matchday_phase: MatchdayPhase | None = None
     impact_summary: str = ""
+    venue_id: str | None = None
 
     @property
     def is_open(self) -> bool:

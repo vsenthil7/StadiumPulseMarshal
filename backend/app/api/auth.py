@@ -47,8 +47,10 @@ def _venue_scope(claims: dict, roles: list[Role]) -> tuple[list[str], bool]:
     """Derive a principal's venue scope from JWT claims.
 
     Recognised claims: ``all_venues`` (bool) and ``venues`` (list) or a single
-    ``venue_id``. Admins are treated as cross-venue by default (estate-wide
-    operators) unless a claim narrows them.
+    ``venue_id``. If a token carries no venue information at all, the principal
+    is treated as unconstrained (cross-venue) — venue restriction applies only
+    when the issuer explicitly scopes the token. This keeps tokens that predate
+    venue scoping working while letting scoped tokens be enforced.
     """
     if claims.get("all_venues") is True:
         return [], True
@@ -61,8 +63,8 @@ def _venue_scope(claims: dict, roles: list[Role]) -> tuple[list[str], bool]:
     single = claims.get("venue_id")
     if single and single not in venues:
         venues.append(str(single))
-    # Admins default to cross-venue unless explicitly scoped to a venue list.
-    if Role.ADMIN in roles and not venues:
+    if not venues:
+        # No venue information in the token → unconstrained.
         return [], True
     return venues, False
 
@@ -88,6 +90,7 @@ async def get_principal(
             subject="api-key",
             roles=roles_from_names(settings.api_key_role_list),
             auth_method="api_key",
+            all_venues=True,
         )
 
     # Bearer token: try the configured secret, then the demo fallback secret.
@@ -145,6 +148,28 @@ def require_venue_access(principal: Principal, venue_id: str | None) -> None:
             "Venue not in principal scope",
             details={"venue_id": venue_id or ""},
         )
+
+
+def scope_collection(principal: Principal, items: list, venue_filter: str | None = None):
+    """Filter a list of venue-bearing items to those the principal may see.
+
+    Items without a ``venue_id`` (estate-wide) are always included. When an
+    explicit ``venue_filter`` is supplied it is authorized first, then applied.
+    """
+    if venue_filter is not None:
+        require_venue_access(principal, venue_filter)
+        return [
+            it for it in items
+            if getattr(it, "venue_id", None) in (None, venue_filter)
+        ]
+    if principal.all_venues:
+        return items
+    allowed = set(principal.venues)
+    return [
+        it for it in items
+        if getattr(it, "venue_id", None) is None
+        or getattr(it, "venue_id", None) in allowed
+    ]
 
 
 # Backwards-compatible alias: authentication only (no specific permission).

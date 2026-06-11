@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.api.auth import require_permission
+from app.api.auth import (
+    require_permission,
+    require_venue_access,
+    scope_collection,
+)
 from app.api.schemas import (
     AnalyzeResponse,
     AuditResponse,
@@ -20,7 +24,7 @@ from app.api.schemas import (
 )
 from app.core.context import AppContext
 from app.models.domain import Problem
-from app.rbac.policy import Permission
+from app.rbac.policy import Permission, Principal
 
 router = APIRouter(prefix="/api/v1")
 
@@ -50,9 +54,14 @@ async def config(request: Request) -> ConfigResponse:
 
 
 @router.get("/problems", response_model=ProblemList, tags=["observability"])
-async def list_problems(request: Request, open_only: bool = False) -> ProblemList:
+async def list_problems(
+    request: Request, open_only: bool = False, venue_id: str | None = None,
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
+) -> ProblemList:
     ctx = _ctx(request)
-    return ProblemList(problems=await ctx.client.list_problems(open_only=open_only))
+    problems = await ctx.client.list_problems(open_only=open_only)
+    problems = scope_collection(principal, problems, venue_id)
+    return ProblemList(problems=problems)
 
 
 @router.get(
@@ -60,11 +69,15 @@ async def list_problems(request: Request, open_only: bool = False) -> ProblemLis
     response_model=Problem,
     tags=["observability"],
 )
-async def get_problem(request: Request, problem_id: str) -> Problem:
+async def get_problem(
+    request: Request, problem_id: str,
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
+) -> Problem:
     ctx = _ctx(request)
     problem = await ctx.client.get_problem(problem_id)
     if problem is None:
         raise HTTPException(status_code=404, detail="Problem not found")
+    require_venue_access(principal, problem.venue_id)
     return problem
 
 

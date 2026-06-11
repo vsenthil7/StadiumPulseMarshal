@@ -4,13 +4,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.api.auth import require_permission
+from app.api.auth import require_permission, scope_collection
 from app.api.schemas_ext import IncidentListResponse, Page
 from app.core.context import AppContext
 from app.core.errors import NotFoundError
 from app.models.enums import Severity
 from app.models.incident import IncidentState
-from app.rbac.policy import Permission
+from app.rbac.policy import Permission, Principal
 from app.services.postmortem import Postmortem, generate_postmortem
 from app.services.slo_history import SLOTrend
 
@@ -79,15 +79,18 @@ async def search_incidents(
     venue_id: str | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    _p=Depends(require_permission(Permission.INCIDENT_READ)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> IncidentListResponse:
     ctx = _ctx(request)
     results, total = await ctx.incidents.search(
         state=state, severity=severity, text=text, venue_id=venue_id,
         offset=offset, limit=limit,
     )
+    scoped = scope_collection(principal, results, venue_id)
     return IncidentListResponse(
-        incidents=results, page=Page(total=total, offset=offset, limit=limit)
+        incidents=scoped,
+        page=Page(total=total if principal.all_venues else len(scoped),
+                  offset=offset, limit=limit),
     )
 
 

@@ -77,3 +77,18 @@ export async function liveMe(token: string): Promise<Session | null> {
     return null;
   }
 }
+
+/** Exchange a still-valid token for a fresh one (silent refresh). */
+export async function liveRefresh(token: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.token ?? null;
+  } catch {
+    return null;
+  }
+}

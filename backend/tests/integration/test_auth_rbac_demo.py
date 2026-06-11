@@ -107,3 +107,45 @@ def test_viewer_cannot_change_settings():
         r = c.patch("/api/v1/settings", json={"auto_approve_low_risk": True},
                     headers={"Authorization": f"Bearer {viewer}"})
         assert r.status_code == 403
+
+
+# ── Round 5: session refresh ────────────────────────────────────────────────
+def test_refresh_issues_fresh_token_preserving_scope():
+    with _client() as c:
+        login = _login(c, "operator@arena-north.demo")
+        old = login
+        r = c.post("/api/v1/auth/refresh",
+                   headers={"Authorization": f"Bearer {old}"})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["token"]
+        assert body["token"] != old  # a new token (different iat/exp)
+        assert body["expires_in"] > 0
+        # the refreshed token still works and preserves venue scope
+        h = {"Authorization": f"Bearer {body['token']}"}
+        me = c.get("/api/v1/auth/me", headers=h).json()["user"]
+        assert me["role"] == "operator"
+        assert me["venue_id"] == "venue_arena_north"
+        # and it is still venue-scoped (cross-venue problem → 403)
+        assert c.get("/api/v1/problems/P-2026-0613-002", headers=h).status_code == 403
+
+
+def test_refresh_rejected_without_token_when_auth_enabled():
+    import jwt
+    from app.main import create_app
+    app = create_app()
+    with TestClient(app) as c:
+        # Enable auth now that startup has populated app.state.ctx.
+        app.state.ctx.settings.auth_enabled = True
+        try:
+            # no token → 401
+            assert c.post("/api/v1/auth/refresh").status_code == 401
+            # tampered token → 401
+            bad = jwt.encode({"sub": "x", "roles": ["admin"]}, "wrong-secret",
+                             algorithm="HS256")
+            assert c.post("/api/v1/auth/refresh",
+                          headers={"Authorization": f"Bearer {bad}"}).status_code == 401
+        finally:
+            # Settings is an lru_cache singleton — restore so we don't pollute
+            # other tests that rely on auth being disabled.
+            app.state.ctx.settings.auth_enabled = False

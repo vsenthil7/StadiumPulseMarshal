@@ -74,6 +74,7 @@ def payment_db_saturation() -> Scenario:
         matchday_phase=MatchdayPhase.HALFTIME,
         impact_summary="Concession payments failing for ~12% of fans at half-time; "
                        "queues building at East stand kiosks.",
+        venue_id="venue_arena_north",
     )
     secondary = Problem(
         id="P-2026-0613-002", title="Fan app backend elevated latency",
@@ -83,6 +84,7 @@ def payment_db_saturation() -> Scenario:
                       timestamp=t(2), description="p90 latency 600ms at kickoff stream surge.")],
         matchday_phase=MatchdayPhase.KICKOFF,
         impact_summary="Fan app live-stats tab slow to load at kickoff.",
+        venue_id="venue_olympic_park",
     )
     resolved = Problem(
         id="P-2026-0613-000", title="Ticket scan gateway brief timeout",
@@ -90,6 +92,7 @@ def payment_db_saturation() -> Scenario:
         resolved_at=t(-80), affected_entities=[entities[2]], events=[],
         matchday_phase=MatchdayPhase.GATES_OPEN,
         impact_summary="Transient scan delays at gates open; self-recovered.",
+        venue_id="venue_arena_north",
     )
     return Scenario(
         key="payment_db_saturation",

@@ -161,3 +161,53 @@ def test_platform_admin_acts_any_venue_entity():
         h = {"Authorization": f"Bearer {sre}"}
         iid = _create_incident_in(c, sre, "venue_olympic_park")
         assert c.get(f"/api/v1/incidents/{iid}", headers=h).status_code == 200
+
+
+# ── Round 5: problem + search venue scoping ─────────────────────────────────
+def test_problems_scoped_to_principal_venue():
+    with _client() as c:
+        # Arena North operator sees only Arena North problems (2 of 3 fixtures).
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        probs = c.get("/api/v1/problems", headers=h).json()["problems"]
+        venues = {p.get("venue_id") for p in probs}
+        assert venues == {"venue_arena_north"}
+
+        # Olympic Park operator sees only the Olympic Park problem.
+        op2 = _login(c, "operator@olympic-park.demo")["token"]
+        h2 = {"Authorization": f"Bearer {op2}"}
+        probs2 = c.get("/api/v1/problems", headers=h2).json()["problems"]
+        assert {p.get("venue_id") for p in probs2} == {"venue_olympic_park"}
+
+
+def test_platform_sees_all_problems():
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        probs = c.get("/api/v1/problems",
+                      headers={"Authorization": f"Bearer {sre}"}).json()["problems"]
+        venues = {p.get("venue_id") for p in probs}
+        assert "venue_arena_north" in venues and "venue_olympic_park" in venues
+
+
+def test_get_problem_cross_venue_403():
+    with _client() as c:
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        # P-...-002 belongs to Olympic Park → 403 for an Arena North operator.
+        r = c.get("/api/v1/problems/P-2026-0613-002", headers=h)
+        assert r.status_code == 403
+        # An Arena North problem is readable.
+        ok = c.get("/api/v1/problems/P-2026-0613-001", headers=h)
+        assert ok.status_code == 200
+
+
+def test_problems_explicit_venue_filter_authorized():
+    with _client() as c:
+        op = _login(c, "operator@arena-north.demo")["token"]
+        h = {"Authorization": f"Bearer {op}"}
+        # asking for another venue explicitly → 403
+        assert c.get("/api/v1/problems?venue_id=venue_olympic_park",
+                     headers=h).status_code == 403
+        # own venue → 200
+        assert c.get("/api/v1/problems?venue_id=venue_arena_north",
+                     headers=h).status_code == 200

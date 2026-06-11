@@ -203,6 +203,7 @@ def problems() -> list[Problem]:
             "Concession payments failing for ~12% of fans at half-time; "
             "queues building at East stand kiosks."
         ),
+        venue_id="venue_arena_north",
     )
     secondary = Problem(
         id="P-2026-0613-002",
@@ -222,6 +223,7 @@ def problems() -> list[Problem]:
         ],
         matchday_phase=MatchdayPhase.KICKOFF,
         impact_summary="Fan app live-stats tab slow to load at kickoff.",
+        venue_id="venue_olympic_park",
     )
     resolved = Problem(
         id="P-2026-0613-000",
@@ -234,6 +236,7 @@ def problems() -> list[Problem]:
         events=[],
         matchday_phase=MatchdayPhase.GATES_OPEN,
         impact_summary="Transient scan delays at gates open; self-recovered.",
+        venue_id="venue_arena_north",
     )
     return [primary, secondary, resolved]
 

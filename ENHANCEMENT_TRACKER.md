@@ -205,3 +205,48 @@ Continuation per review. Scope not shrunk.
 - **T8:** backend 251 pass; docs + .env.example updated; packaged.
 
 ### Round 4 — COMPLETE
+
+---
+
+## Round 5 — Venue-partition the remaining data domains + OIDC refresh/rotation
+
+Two reviewer edges from Round 4: (a) only incidents are venue-scoped; SLO/
+analytics/observability aren't filtered by venue; (b) OIDC issues a single
+session token with no renewal. Round 5 addresses both.
+
+### Sprints
+| # | Sprint | Status |
+|---|--------|--------|
+| U1 | Model: attach venue_id to Problem/SLO/Analytics where applicable | 🟢 |
+| U2 | Observability routes accept venue filter; enforce principal scope | 🟢 |
+| U3 | SLO + analytics routes venue-scoped; default to principal venues | 🟢 |
+| U4 | Tests: cross-venue 403 / scoped results on problems, slo, analytics | 🟢 |
+| U5 | Session refresh: /auth/refresh issues a fresh token from a valid one | 🟢 |
+| U6 | Frontend: silent token refresh before expiry; refresh on 401-once | 🟢 |
+| U7 | Tests: refresh happy-path + expired/invalid refusal | 🟢 |
+| U8 | Full suite + frontend build green; docs + package | 🟢 |
+
+### Round 5 changelog
+- **U1–U4 (venue-partition the data domains):** `Problem` gained `venue_id`;
+  seeded scenario problems split across the two demo venues. New
+  `scope_collection` helper; `/problems`, `/problems/{id}` and `/incidents-search`
+  are now venue-scoped, and incident creation inherits the source problem's
+  venue. +11 tests (operator sees only own venue, 403 cross-venue by list /
+  id / filter, platform sees all). Live-verified.
+- **Fix (important):** first pass scoped bare (claim-less) JWTs to *zero*
+  venues and broke 11 pre-existing tests. Corrected the semantics — venue
+  restriction applies only when a token explicitly carries venue scope; API-key
+  principals are cross-venue. Demo logins (which always set `venue_id`) remain
+  enforced.
+- **U5–U7 (OIDC/session refresh):** `POST /api/v1/auth/refresh` re-mints a token
+  for the current principal (preserving roles + venue scope); requires a valid
+  token (401 otherwise). Frontend does silent refresh every 30m for live
+  sessions. +2 tests (happy path preserves scope; auth-enabled refuses
+  missing/tampered token).
+- **Fix:** caught + fixed a test-pollution bug — a test mutated the
+  `lru_cache` settings singleton (`auth_enabled`) and leaked into later tests;
+  now restored in a `finally`.
+- **U8:** backend **257 pass**; frontend `tsc -b` + `vite build` green; 7 node
+  RBAC unit tests pass. Docs + package.
+
+### Round 5 — COMPLETE

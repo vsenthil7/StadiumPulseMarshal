@@ -125,6 +125,40 @@ async def me(
     }
 
 
+@router.post("/refresh")
+async def refresh(
+    request: Request,
+    principal: Principal = Depends(get_principal),
+) -> dict:
+    """Issue a fresh session token from a currently-valid one.
+
+    Lets the SPA renew before expiry (silent refresh) without forcing the user
+    to sign in again. Requires a valid presented token — an expired or invalid
+    token resolves to 401 via ``get_principal`` (when auth is enabled), so this
+    cannot be used to resurrect a dead session. The new token carries the same
+    subject, roles and venue scope as the current principal.
+    """
+    if _jwt is None:
+        return {"token": None}
+    settings = request.app.state.ctx.settings
+    now = int(time.time())
+    payload = {
+        "sub": principal.subject,
+        settings.jwt_roles_claim: [r.value for r in principal.roles],
+        "venues": principal.venues,
+        "all_venues": principal.all_venues,
+        "iat": now,
+        "exp": now + 8 * 3600,
+    }
+    # Preserve a friendly name/venue when the subject is a known demo user.
+    user = DEMO_USERS.get(principal.subject)
+    if user is not None:
+        payload["name"] = user["name"]
+        payload["venue_id"] = user["venue_id"]
+    token = _jwt.encode(payload, _secret(request), algorithm="HS256")
+    return {"token": token, "expires_in": 8 * 3600}
+
+
 @router.get("/demo-users")
 async def demo_users() -> dict:
     """List demo accounts (without secrets) for the login quick-fill."""

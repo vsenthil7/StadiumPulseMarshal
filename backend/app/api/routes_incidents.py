@@ -70,8 +70,6 @@ async def create_incident(
     principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
-    # A principal may only create incidents within a venue it can access.
-    require_venue_access(principal, body.venue_id)
     # Idempotent replay: same key returns the stored response, no new incident.
     if idempotency_key:
         cached = ctx.idempotency.get("incident:create", idempotency_key)
@@ -80,8 +78,13 @@ async def create_incident(
     problem = await ctx.client.get_problem(body.problem_id)
     if problem is None:
         raise HTTPException(status_code=404, detail="Problem not found")
+    # The incident inherits the problem's venue when one isn't supplied, so the
+    # incident is partitioned consistently with its source problem.
+    effective_venue = body.venue_id or problem.venue_id
+    # A principal may only create incidents within a venue it can access.
+    require_venue_access(principal, effective_venue)
     incident = await ctx.incidents.create_from_problem(
-        problem, venue_id=body.venue_id, match_id=body.match_id
+        problem, venue_id=effective_venue, match_id=body.match_id
     )
     response = IncidentResponse(incident=incident)
     if idempotency_key:

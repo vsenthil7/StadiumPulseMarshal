@@ -16,7 +16,7 @@ import { setAuthToken, setClientUnauthorizedHandler } from '../../api/client';
 import { setHttpAuthToken, setUnauthorizedHandler } from '../../api/http';
 import { persistSession, restoreSession } from './session-store';
 import { seedLogin } from './seed-auth';
-import { liveLogin, liveMe } from './live-auth';
+import { liveLogin, liveMe, liveRefresh } from './live-auth';
 import type { AuthSource, LoginResult, Session } from './types';
 
 export type { SessionUser, AuthSource, Session, LoginResult } from './types';
@@ -65,6 +65,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClientUnauthorizedHandler(null);
     };
   }, [clear]);
+
+  // Silent token refresh: for a live session, renew the token periodically so
+  // long-lived sessions don't expire mid-use. (8h token; refresh every 30m.)
+  useEffect(() => {
+    if (session?.source !== 'live' || !session.token) return;
+    const id = window.setInterval(async () => {
+      const current = session.token;
+      if (!current) return;
+      const fresh = await liveRefresh(current);
+      if (fresh) {
+        setSession((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, token: fresh };
+          persistSession(next);
+          return next;
+        });
+      }
+    }, 30 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [session?.source, session?.token]);
 
   // On mount: handle an OIDC callback token in the URL fragment, else if we
   // restored a live session verify/rehydrate it via /auth/me.

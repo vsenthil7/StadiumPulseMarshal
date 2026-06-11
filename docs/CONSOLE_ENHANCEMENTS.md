@@ -212,3 +212,35 @@ A self-contained mock IdP (RSA keypair, discovery doc, JWKS, token endpoint via
 
 ### Tests
 Backend **251 pass** (+6 full-flow/negative OIDC). Frontend build unchanged/green.
+
+---
+
+## Round 5 — Venue-partitioned data domains + session refresh
+
+### Venue partitioning beyond incidents
+`Problem` now carries `venue_id`, and the seeded matchday problems are split
+across the two demo venues. Venue scope is enforced on the observability data,
+not just incidents:
+- `GET /problems` returns only problems the caller's venues cover (platform
+  principals see all);
+- `GET /problems/{id}` is **403** across venues;
+- `GET /incidents-search` results are scoped;
+- creating an incident inherits the source problem's venue.
+
+**Scope semantics (important):** venue restriction applies only when a token
+explicitly carries venue scope (a `venue_id`/`venues` claim or `all_venues`).
+Tokens with no venue information are treated as unconstrained, so service/API-key
+credentials and legacy tokens keep working; the demo login always sets a venue,
+so demo roles are properly scoped. Verified live: an Arena North operator sees
+only Arena North problems and is 403 on an Olympic Park problem.
+
+### Session refresh (silent token renewal)
+`POST /api/v1/auth/refresh` exchanges a still-valid token for a fresh one,
+preserving subject, roles and venue scope. It requires a valid token (an expired
+or tampered token is 401), so it cannot resurrect a dead session. The SPA renews
+silently every 30 minutes for live sessions, so long matchday shifts don't get
+bounced to the login screen mid-incident.
+
+### Tests
+Backend **257 pass** (+13 this round). Frontend `tsc -b` + `vite build` green;
+7 node RBAC unit tests pass.
