@@ -62,11 +62,24 @@ class NotificationStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class NotificationSource(str, Enum):
+    INCIDENT = "incident"
+    BURN_ALERT = "burn_alert"
+
+
 class Notification(BaseModel):
-    """A notification dispatched (or queued) for an incident."""
+    """A notification dispatched (or queued).
+
+    Originally incident-bound; now ``incident_id`` is optional so notifications
+    can originate from other sources (e.g. SLO burn-rate alerts). ``source`` and
+    ``severity`` let the UI group/colour them and let routing pick a channel.
+    """
 
     id: str
-    incident_id: str
+    incident_id: str | None = None
+    source: NotificationSource = NotificationSource.INCIDENT
+    severity: str = ""
+    venue_id: str | None = None
     channel: NotificationChannel
     recipient: str
     subject: str

@@ -96,11 +96,14 @@ def evaluate_burn_alerts(
     slos: list[SLO],
     budgets: list[ErrorBudget],
     venue_of: dict[str, str | None] | None = None,
+    metrics=None,
 ) -> list[BurnAlert]:
     """Build burn alerts from current budgets.
 
-    ``budgets`` carry an ``achieved`` fraction; the observed error rate is
-    ``1 - achieved``. ``venue_of`` maps slo_id → venue for scoping/labels.
+    If a ``metrics`` history is supplied, each tier is evaluated with the *real*
+    long- and short-window error rates from recorded samples (the proper
+    multi-window method). Without it (or when a window has no samples) we fall
+    back to the budget's single ``achieved`` rate for both windows.
     """
     venue_of = venue_of or {}
     by_id = {s.id: s for s in slos}
@@ -109,8 +112,47 @@ def evaluate_burn_alerts(
         slo = by_id.get(b.slo_id)
         if slo is None:
             continue
-        error_rate = max(0.0, 1.0 - b.achieved)
-        alert = classify_burn(slo, error_rate, venue_id=venue_of.get(b.slo_id))
+        fallback_rate = max(0.0, 1.0 - b.achieved)
+        venue = venue_of.get(b.slo_id)
+
+        if metrics is not None and metrics.has_samples(b.slo_id):
+            # Evaluate each tier with its own long/short windows; take the
+            # highest-severity tier that fires on BOTH its windows.
+            alert = _evaluate_with_windows(slo, b.slo_id, metrics, fallback_rate, venue)
+        else:
+            alert = classify_burn(slo, fallback_rate, venue_id=venue)
         if alert is not None:
             alerts.append(alert)
     return alerts
+
+
+def _evaluate_with_windows(slo, slo_id, metrics, fallback_rate, venue):
+    """Find the highest-severity tier whose long AND short window both exceed
+    its burn factor, using real recorded per-window error rates."""
+    for tier in BURN_TIERS:
+        long_rate = metrics.error_rate_over(slo_id, tier.long_hours)
+        short_rate = metrics.error_rate_over(slo_id, tier.short_hours)
+        if long_rate is None:
+            long_rate = fallback_rate
+        if short_rate is None:
+            short_rate = fallback_rate
+        long_burn = _burn_rate(slo, long_rate)
+        short_burn = _burn_rate(slo, short_rate)
+        if long_burn >= tier.factor and short_burn >= tier.factor:
+            consumed_pct = round(
+                min(100.0, 100.0 * long_burn / max(1.0, slo.window_hours)), 2
+            )
+            return BurnAlert(
+                slo_id=slo.id, slo_name=slo.name, service_id=slo.service_id,
+                venue_id=venue, severity=tier.severity,
+                burn_rate=round(long_burn, 3) if long_burn != float("inf") else 9999.0,
+                long_window_hours=tier.long_hours,
+                short_window_hours=tier.short_hours, factor=tier.factor,
+                error_budget_consumed_pct=consumed_pct,
+                message=(
+                    f"{tier.name} burn: {slo.name} burning error budget at "
+                    f"{long_burn:.1f}x (>= {tier.factor}x over "
+                    f"{tier.long_hours:g}h/{tier.short_hours*60:g}m)"
+                ),
+            )
+    return None

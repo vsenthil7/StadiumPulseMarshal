@@ -50,6 +50,7 @@ async def slo_burn_alerts(
     ctx = _ctx(request)
     alerts = await ctx.burn_alerts(
         principal_venues=None if principal.all_venues else principal.venues,
+        notify=True,
     )
     return BurnAlertList(
         alerts=alerts,

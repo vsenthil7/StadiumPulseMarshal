@@ -656,3 +656,71 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **Y2:** docs + package.
 
 ### Round 12 — COMPLETE (X2 deferred)
+
+---
+
+## Round 13 — Burn→notification routing, true per-window burn rates, compose loop
+
+### Track Z — burn-alert → notification routing (proper model)
+| # | Sprint | Status |
+|---|--------|--------|
+| Z1 | Generalize Notification: optional incident_id + source + severity | 🟢 |
+| Z2 | Channel routing policy: page→pagerduty/sms, ticket→email/slack | 🟢 |
+| Z3 | notify_burn_alert(); dedupe per (slo_id,severity) window; context wire | 🟢 |
+| Z4 | Auto-notify on burn evaluation; /notifications surfaces burn alerts | 🟢 |
+| Z5 | Tests: page routes to pagerduty, ticket to email, dedupe, model | 🟢 |
+
+### Track AA — true per-window error rates from metrics history
+| # | Sprint | Status |
+|---|--------|--------|
+| AA1 | MetricsHistory: ring buffer of per-SLO measurements w/ timestamps | 🟢 |
+| AA2 | Per-window error rate (1h/5m/6h/30m...) from recorded samples | 🟢 |
+| AA3 | Burn engine consumes real long+short window rates | 🟢 |
+| AA4 | Context records measurements over time; burn uses windows | 🟢 |
+| AA5 | Tests: window aggregation correct; fast vs slow distinguished by windows | 🟢 |
+
+### Track AB — close the container loop (no Docker host available)
+| # | Sprint | Status |
+|---|--------|--------|
+| AB1 | Validate docker-compose.yml + nginx.conf structurally (parse/lint) | 🟢 |
+| AB2 | Compose-equivalent harness: real multilevel HTTP via Redis (fakeredis) | 🟢 |
+| AB3 | Document exact run + expected verifier output; Makefile target | 🟢 |
+
+### Track AC — supporting depth
+| # | Sprint | Status |
+|---|--------|--------|
+| AC1 | Notifications page/section shows burn-sourced alerts w/ severity | 🟢 |
+| AC2 | Tests + tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| AD1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| AD2 | Docs + package | 🟢 |
+
+### Round 13 changelog
+- **Track Z — burn→notification routing (proper model):** Notification model
+  generalized (optional incident_id + source + severity + venue_id);
+  NotificationSource enum. notify_burn_alert routes by severity — page →
+  PagerDuty+SMS, ticket → email+Slack — with per-(slo,severity) dedupe within the
+  tier window. Burn evaluation auto-notifies; /notifications surfaces burn-sourced
+  alerts. +5 tests. Live-verified (ticket → email+slack, deduped on re-eval).
+- **Track AA — true per-window error rates:** new MetricsHistory ring buffer
+  records per-SLO error-rate samples with timestamps; error_rate_over(slo,hours)
+  gives the trailing-window rate. Burn engine now evaluates each tier with REAL
+  long+short window rates (falls back to the budget rate without samples). Context
+  records samples each evaluation. +5 tests (windowing, short-window-cold
+  suppression, fallback).
+- **Track AB — close the container loop:** docker-compose.yml + nginx.conf
+  structurally validated by tests (both replicas share REDIS_URL, LB balances
+  both, verifier asserts 429); Makefile multi-up/multi-verify/multi-down targets;
+  runtime behaviour already proven by the real-Redis HTTP round-robin e2e
+  (test_redis_e2e). Docker host still unavailable in-sandbox; everything needed to
+  run it on a Docker host is in place + guarded against regression.
+- **Track AC — depth:** NotificationItem (frontend) carries source/severity/venue;
+  burn-sourced notifications flow through the existing notifications API.
+- **AD1:** backend **342 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **AD2:** docs + package.
+
+### Round 13 — COMPLETE

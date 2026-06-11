@@ -72,6 +72,9 @@ class AppContext:
         from app.services.slo_history import SLOHistory
 
         self.slo_history = SLOHistory()
+        from app.services.metrics_history import MetricsHistory
+
+        self.metrics_history = MetricsHistory()
         from app.services.entity_venue import EntityVenueResolver
 
         self.entity_venue = EntityVenueResolver()
@@ -144,6 +147,9 @@ class AppContext:
         for b in budgets:
             await self.repos.slo.save_budget(b)
         self.slo_history.record(budgets)
+        # Record per-SLO error-rate samples for multi-window burn computation.
+        for b in budgets:
+            self.metrics_history.record(b.slo_id, max(0.0, 1.0 - b.achieved))
         return budgets
 
     async def analytics(
@@ -186,7 +192,7 @@ class AppContext:
                 sid: self.entity_venue.venue_for(eid)
                 for sid, eid in slo_entity.items()
             }
-            alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of)
+            alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of, metrics=self.metrics_history)
             if allowed is not None:
                 alerts = [a for a in alerts
                           if a.venue_id is None or a.venue_id in allowed]
@@ -201,7 +207,7 @@ class AppContext:
         return summary
 
     async def burn_alerts(
-        self, principal_venues: list[str] | None = None,
+        self, principal_venues: list[str] | None = None, notify: bool = False,
     ) -> list:
         """Evaluate multi-window burn-rate alerts, scoped to the principal's
         venues (None = all). Maps each SLO to its owning venue for labels and
@@ -217,13 +223,21 @@ class AppContext:
             sid: self.entity_venue.venue_for(eid)
             for sid, eid in slo_entity.items()
         }
-        alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of)
+        alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of, metrics=self.metrics_history)
         if principal_venues is not None:
             allowed = set(principal_venues)
             alerts = [
                 a for a in alerts
                 if a.venue_id is None or a.venue_id in allowed
             ]
+        # Auto-route page/ticket burn alerts to notification channels (the
+        # service dedupes per slo+severity within the alert window).
+        if notify:
+            for a in alerts:
+                try:
+                    await self.notifications.notify_burn_alert(a)
+                except Exception:  # noqa: BLE001 - alerting must not fail reads
+                    pass
         return alerts
 
     async def analytics_by_venue(

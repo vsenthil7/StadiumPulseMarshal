@@ -478,3 +478,35 @@ path across two ASGI app instances, not just at the limiter level. The
 ### Tests
 Backend **328 pass** (+14 this round). Frontend `tsc -b` + `vite build` green;
 7 node RBAC unit tests pass.
+
+---
+
+## Round 13 — Burn→notification routing, true per-window burn rates, container loop
+
+### Burn alerts route to notification channels
+The Notification model is generalized (optional `incident_id`, plus `source`,
+`severity`, `venue_id`) so non-incident notifications are first-class. A burn
+alert is routed by severity — **page → PagerDuty + SMS**, **ticket → email +
+Slack** — and deduplicated per (SLO, severity) within the tier's window so a
+sustained burn doesn't spam. Burn evaluation auto-notifies; the notifications API
+surfaces burn-sourced alerts. Verified live: a ticket-tier burn routed to email +
+Slack and did not duplicate on re-evaluation.
+
+### True multi-window burn rates
+`MetricsHistory` records per-SLO error-rate samples with timestamps;
+`error_rate_over(slo, hours)` returns the trailing-window rate. The burn engine
+now evaluates each tier with the **real long- and short-window rates** (e.g.
+1h + 5m for fast), so an already-recovered incident (long window hot, short
+window clean) does not page — the genuine multi-window guard. Without samples it
+falls back to the budget's single rate.
+
+### Multi-instance container loop
+`docker-compose.yml` (Redis + two app replicas + nginx LB) and
+`scripts/verify_multi_instance.sh` are now guarded by config tests (both replicas
+share `REDIS_URL`, the LB balances both, the verifier asserts a 429), and
+`make multi-up / multi-verify / multi-down` run the stack on any Docker host. The
+runtime property is already proven in-sandbox by the real-Redis HTTP round-robin
+test.
+
+### Tests
+Backend **342 pass** (+14 this round). Frontend `tsc -b` + `vite build` green.

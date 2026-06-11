@@ -186,7 +186,10 @@ export interface VenueAnalytics {
 
 export interface NotificationItem {
   id: string;
-  incident_id: string;
+  incident_id: string | null;
+  source?: string;
+  severity?: string;
+  venue_id?: string | null;
   channel: string;
   recipient: string;
   subject: string;
