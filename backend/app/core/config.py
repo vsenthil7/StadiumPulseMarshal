@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     oncall_api_token: str | None = None
     # Map schedule id → tier name, e.g. "SCHED_A=TIER3,SCHED_B=TIER2".
     oncall_schedule_tier_map: str = Field(default="")
+    # Local rotation (when no external schedule API): rotate per-tier pools on a
+    # fixed shift cadence so the on-call roster advances over time.
+    oncall_rotation_enabled: bool = Field(default=True)
+    oncall_shift_hours: float = Field(default=12.0)
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

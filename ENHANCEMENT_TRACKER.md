@@ -857,3 +857,24 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **AN2:** docs + package.
 
 ### Round 15 — COMPLETE
+
+### Round 16 changelog
+- **Track AO — rotation pools:** default_oncall_pools (2 engineers/tier);
+  build_schedule_source uses RotatingScheduleSource when pools present +
+  rotation enabled (config ONCALL_ROTATION_ENABLED/ONCALL_SHIFT_HOURS).
+  /oncall exposes schedule.rotation (current + next per tier); On-call page
+  shows the rotation. +2 tests. Live-verified rotation active.
+- **Track AP — burn ack/silence workflow:** BurnAckStore (ack who/when, silence
+  until-expiry); burn eval marks acked/silenced and suppresses dispatch when
+  silenced; POST /slo/burn-alerts/{slo}/ack + /silence (responder+, audited).
+  Banner gains Ack / Silence buttons + acked/silenced styling. +4 tests.
+  Live-verified ack records responder + acked_count.
+- **Track AQ — metric-selector preview:** GET /slo/{id}/metric-preview returns
+  the resolved selector + sample series + per-window error rates (venue-scoped,
+  404 unknown). +2 tests. Live-verified (payments selector + 72 samples).
+- **Track AR — depth:** BurnAlertList carries acked_count/silenced_count.
+- **AS1:** backend **374 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **AS2:** docs + package.
+
+### Round 16 — COMPLETE

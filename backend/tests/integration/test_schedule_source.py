@@ -117,3 +117,29 @@ def test_build_selects_external_when_configured():
     assert isinstance(s, ExternalScheduleSource)
     s2 = build_schedule_source(Settings(), [])
     assert isinstance(s2, StaticScheduleSource)
+
+
+# ── Round 16: rotation pools wired by default ───────────────────────────────
+def test_default_pools_rotate_and_build_rotating_source():
+    from app.core.config import Settings
+    from app.services.ops_defaults import default_oncall_pools, default_on_call
+    from app.services.schedule_source import build_schedule_source, RotatingScheduleSource
+    src = build_schedule_source(Settings(), default_on_call(), pools=default_oncall_pools())
+    assert isinstance(src, RotatingScheduleSource)
+    view = src.pool_view(now=0)
+    tiers = {r["tier"] for r in view}
+    assert {"TIER1", "TIER2", "TIER3"} <= tiers
+    # each tier has a current + next with a pool of >= 2
+    for r in view:
+        assert r["pool_size"] >= 2
+        assert r["current"]["name"] != r["next"]["name"]
+
+
+def test_rotation_disabled_falls_back_to_static():
+    from app.core.config import Settings
+    from app.services.ops_defaults import default_oncall_pools, default_on_call
+    from app.services.schedule_source import build_schedule_source, StaticScheduleSource
+    src = build_schedule_source(
+        Settings(oncall_rotation_enabled=False), default_on_call(),
+        pools=default_oncall_pools())
+    assert isinstance(src, StaticScheduleSource)

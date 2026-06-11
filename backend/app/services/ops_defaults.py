@@ -57,6 +57,36 @@ def default_on_call() -> list[OnCallEngineer]:
     ]
 
 
+def default_oncall_pools() -> dict[EscalationTier, list[OnCallEngineer]]:
+    """A rotation pool per tier (2+ engineers) so the on-call roster advances
+    each shift. The first of each pool matches default_on_call() so behaviour is
+    stable when rotation is disabled."""
+    return {
+        EscalationTier.TIER1: [
+            OnCallEngineer(id="OC-1", name="Venue Ops", tier=EscalationTier.TIER1,
+                           handle="venue-ops@tournament.example", channels=["email"]),
+            OnCallEngineer(id="OC-1b", name="Venue Ops (B)", tier=EscalationTier.TIER1,
+                           handle="venue-ops-b@tournament.example", channels=["email"]),
+        ],
+        EscalationTier.TIER2: [
+            OnCallEngineer(id="OC-2", name="SRE On-Call", tier=EscalationTier.TIER2,
+                           handle="sre-oncall@tournament.example",
+                           channels=["slack", "sms"]),
+            OnCallEngineer(id="OC-2b", name="SRE On-Call (B)", tier=EscalationTier.TIER2,
+                           handle="sre-oncall-b@tournament.example",
+                           channels=["slack", "sms"]),
+        ],
+        EscalationTier.TIER3: [
+            OnCallEngineer(id="OC-3", name="Incident Commander",
+                           tier=EscalationTier.TIER3,
+                           handle="ic@tournament.example", channels=["pagerduty"]),
+            OnCallEngineer(id="OC-3b", name="Incident Commander (B)",
+                           tier=EscalationTier.TIER3,
+                           handle="ic-b@tournament.example", channels=["pagerduty"]),
+        ],
+    }
+
+
 def synthetic_measurement(slo: SLO) -> SLOMeasurement:
     """Derive a plausible SLO measurement from the SLO id.
 

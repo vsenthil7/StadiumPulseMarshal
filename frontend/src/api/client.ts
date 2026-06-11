@@ -123,9 +123,18 @@ export const apiExt = {
         long_window_hours: number; short_window_hours: number;
         error_budget_consumed_pct: number; message: string;
         on_call_targets?: { name: string; tier: string; recipient: string; channels: string[] }[];
+        acknowledged?: boolean; acked_by?: string; silenced?: boolean;
       }[];
-      page_count: number; ticket_count: number;
+      page_count: number; ticket_count: number; acked_count?: number; silenced_count?: number;
     }>('/slo/burn-alerts'),
+  ackBurnAlert: (sloId: string, severity: string, note = '') =>
+    http<{ acknowledged: boolean }>(`/slo/burn-alerts/${sloId}/ack`, {
+      method: 'POST', body: JSON.stringify({ severity, note }),
+    }),
+  silenceBurnAlert: (sloId: string, severity: string, minutes = 60) =>
+    http<{ silenced: boolean }>(`/slo/burn-alerts/${sloId}/silence`, {
+      method: 'POST', body: JSON.stringify({ severity, minutes }),
+    }),
   getOnCall: () =>
     http<{
       roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
@@ -134,7 +143,10 @@ export const apiExt = {
         steps: { tier: string; after_minutes: number; notify_channels: string[] }[];
       }[];
       burn_targets: Record<string, { name: string; tier: string; recipient: string; channels: string[] }[]>;
-      schedule?: { type: string; next_handoff_epoch?: number; now_epoch?: number };
+      schedule?: {
+        type: string; next_handoff_epoch?: number; now_epoch?: number;
+        rotation?: { tier: string; current: { name: string }; next: { name: string }; pool_size: number }[];
+      };
     }>('/oncall'),
   getNotifications: () =>
     http<{ notifications: NotificationItem[] }>('/notifications').then(

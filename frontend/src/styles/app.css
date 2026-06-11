@@ -692,3 +692,10 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .policy-ladder { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;
   font-size: 13px; }
 .burn-pages { font-size: 12px; color: var(--accent, #1f6feb); white-space: nowrap; }
+.burn-item.burn-muted { opacity: .55; }
+.burn-actions { display: inline-flex; gap: 6px; margin-left: 8px; }
+.burn-state-chip { font-size: 11px; padding: 1px 7px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-2); }
+.rotation-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rotation-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.rotation-next { color: var(--ink-2); }

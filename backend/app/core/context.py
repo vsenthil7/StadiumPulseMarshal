@@ -15,6 +15,7 @@ from app.services.notification_service import NotificationService
 from app.services.ops_defaults import (
     default_escalation_policies,
     default_on_call,
+    default_oncall_pools,
     synthetic_measurement,
 )
 from app.services.slo_engine import SLOEngine
@@ -40,10 +41,13 @@ class AppContext:
 
         self.oncall_directory = OnCallDirectory(default_on_call())
         self.notifications.set_oncall_directory(self.oncall_directory)
+        from app.services.burn_ack_store import BurnAckStore
+
+        self.burn_acks = BurnAckStore()
         from app.services.schedule_source import build_schedule_source
 
         self.schedule_source = build_schedule_source(
-            self.settings, default_on_call()
+            self.settings, default_on_call(), pools=default_oncall_pools(),
         )
         # Event bus + webhook dispatcher.
         import httpx
@@ -281,10 +285,19 @@ class AppContext:
                  "channels": [c.value for c in t.channels]}
                 for t in self.oncall_directory.targets_for_severity(sev)
             ]
+            # Acknowledge / silence state.
+            ack = self.burn_acks.ack_for(a.slo_id, sev)
+            if ack is not None:
+                a.acknowledged = True
+                a.acked_by = ack.acked_by
+            a.silenced = self.burn_acks.is_silenced(a.slo_id, sev)
         # Auto-route page/ticket burn alerts to notification channels (the
-        # service dedupes per slo+severity within the alert window).
+        # service dedupes per slo+severity within the alert window). Silenced
+        # alerts are not dispatched.
         if notify:
             for a in alerts:
+                if a.silenced:
+                    continue
                 try:
                     await self.notifications.notify_burn_alert(a)
                 except Exception:  # noqa: BLE001 - alerting must not fail reads

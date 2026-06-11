@@ -56,7 +56,57 @@ async def slo_burn_alerts(
         alerts=alerts,
         page_count=sum(1 for a in alerts if a.severity.value == "page"),
         ticket_count=sum(1 for a in alerts if a.severity.value == "ticket"),
+        acked_count=sum(1 for a in alerts if a.acknowledged),
+        silenced_count=sum(1 for a in alerts if a.silenced),
     )
+
+
+class _AckBody(BaseModel):
+    severity: str
+    note: str = ""
+
+
+class _SilenceBody(BaseModel):
+    severity: str
+    minutes: float = 60.0
+
+
+@router.post("/slo/burn-alerts/{slo_id}/ack", tags=["slo"])
+async def ack_burn_alert(
+    slo_id: str, body: _AckBody, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Acknowledge a burn alert (responder+). Recorded with who/when + audited."""
+    ctx = _ctx(request)
+    rec = ctx.burn_acks.acknowledge(slo_id, body.severity, principal.subject, body.note)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="burn.ack",
+            resource_type="burn_alert", resource_id=f"{slo_id}:{body.severity}",
+            metadata={"note": body.note},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"acknowledged": True, "by": rec.acked_by, "at": rec.acked_at}
+
+
+@router.post("/slo/burn-alerts/{slo_id}/silence", tags=["slo"])
+async def silence_burn_alert(
+    slo_id: str, body: _SilenceBody, request: Request,
+    principal: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
+) -> dict:
+    """Silence a burn alert for N minutes (responder+); suppresses dispatch."""
+    ctx = _ctx(request)
+    rec = ctx.burn_acks.silence(slo_id, body.severity, body.minutes, principal.subject)
+    try:
+        await ctx.audit.record(
+            actor=principal.subject, action="burn.silence",
+            resource_type="burn_alert", resource_id=f"{slo_id}:{body.severity}",
+            metadata={"minutes": body.minutes},
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"silenced": True, "until": rec.until, "by": rec.by}
 
 
 @router.get("/slo/trends", response_model=SLOTrendResponse, tags=["slo"])

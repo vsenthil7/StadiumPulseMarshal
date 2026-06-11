@@ -567,3 +567,32 @@ source and the next-handoff time.
 
 ### Tests
 Backend **366 pass** (+10 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 16 — Rotation pools, burn ack/silence, metric-selector preview
+
+### Rotating on-call pools
+The default deployment now rotates a per-tier pool (two engineers per tier) on a
+fixed shift cadence, so the resolved roster advances each shift. `/oncall`
+exposes the rotation (current holder + who is next per tier, plus next-handoff)
+and the On-call page renders it. Rotation is config-toggled
+(`ONCALL_ROTATION_ENABLED`, `ONCALL_SHIFT_HOURS`); disabling it falls back to the
+static roster.
+
+### Burn-alert acknowledge / silence
+Responders can acknowledge a burn alert (recorded with who/when, audited) or
+silence it for a period — a silenced alert is marked and not dispatched, so a
+burn already being worked stops paging. The Reliability banner shows Ack /
+Silence buttons (responder+), acked/silenced styling, and the alert list carries
+`acked_count` / `silenced_count`. Endpoints: `POST /slo/burn-alerts/{slo}/ack`
+and `/silence`.
+
+### Metric-selector preview
+`GET /slo/{id}/metric-preview` returns the resolved metric selector, a sample
+error series, and the per-window error rates (5m/1h/6h) the burn engine would
+use — so an operator can confirm a selector resolves before relying on it.
+Venue-scoped; 404 for an unknown SLO.
+
+### Tests
+Backend **374 pass** (+8 this round). Frontend `tsc -b` + `vite build` green.

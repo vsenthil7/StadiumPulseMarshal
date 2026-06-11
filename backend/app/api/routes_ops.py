@@ -1,7 +1,7 @@
 """SLO, analytics, notifications and scenario API routes."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.auth import require_permission, require_venue_access
 from app.rbac.policy import Permission, Principal
@@ -102,6 +102,57 @@ async def list_notifications(
     return NotificationListResponse(notifications=notifications)
 
 
+@router.get("/slo/{slo_id}/metric-preview", tags=["slo"])
+async def slo_metric_preview(
+    slo_id: str, request: Request, lookback_hours: float = 6.0,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Preview the metric selector + sample error series for an SLO.
+
+    Lets an operator confirm a (live or synthetic) metric selector resolves and
+    see the per-window error rates that burn evaluation would use, before relying
+    on it. Venue-scoped via the SLO's owning entity.
+    """
+    ctx = _ctx(request)
+    slo = next((s for s in ctx.slo_engine.slos if s.id == slo_id), None)
+    if slo is None:
+        raise HTTPException(status_code=404, detail="SLO not found")
+    await ctx.ensure_entity_venue_map()
+    venue = ctx.entity_venue.venue_for(slo.service_id)
+    require_venue_access(principal, venue)
+
+    from app.services.metrics_source import _metric_selector_for
+
+    selector = _metric_selector_for(slo, ctx.settings)
+    try:
+        samples = await ctx.metrics_source.error_series(slo, lookback_hours)
+    except Exception:  # noqa: BLE001
+        samples = []
+    # Per-window rates the burn engine would compute.
+    import time as _t
+
+    hist_preview = {}
+    from app.services.metrics_history import MetricsHistory
+
+    mh = MetricsHistory()
+    for s in samples:
+        mh.record(slo.id, s.error_rate, weight=s.weight, at=s.at)
+    for label, hours in (("5m", 5 / 60), ("1h", 1.0), ("6h", 6.0)):
+        rate = mh.error_rate_over(slo.id, hours)
+        hist_preview[label] = round(rate, 5) if rate is not None else None
+    return {
+        "slo_id": slo.id, "slo_name": slo.name, "sli_kind": slo.sli.kind.value,
+        "service_id": slo.service_id, "venue_id": venue,
+        "metric_selector": selector,
+        "sample_count": len(samples),
+        "window_error_rates": hist_preview,
+        "points": [
+            {"at": round(s.at, 1), "error_rate": round(s.error_rate, 5)}
+            for s in samples[-20:]
+        ],
+    }
+
+
 @router.get("/oncall", tags=["oncall"])
 async def get_oncall(
     request: Request,
@@ -150,6 +201,8 @@ async def get_oncall(
     if hasattr(src, "next_handoff"):
         schedule["next_handoff_epoch"] = src.next_handoff()
         schedule["now_epoch"] = _time.time()
+    if hasattr(src, "pool_view"):
+        schedule["rotation"] = src.pool_view()
     return {
         "roster": roster, "policies": policies, "burn_targets": burn_targets,
         "schedule": schedule,

@@ -70,6 +70,24 @@ class RotatingScheduleSource:
         now = time.time() if now is None else now
         return (int(now // self.shift_seconds) + 1) * self.shift_seconds
 
+    def pool_view(self, now: float | None = None) -> list[dict]:
+        """Per-tier rotation view: current holder + who is next."""
+        now = time.time() if now is None else now
+        shift = int(now // self.shift_seconds)
+        out: list[dict] = []
+        for tier, pool in self.pools.items():
+            if not pool:
+                continue
+            cur = pool[shift % len(pool)]
+            nxt = pool[(shift + 1) % len(pool)]
+            out.append({
+                "tier": tier.value,
+                "current": {"id": cur.id, "name": cur.name, "handle": cur.handle},
+                "next": {"id": nxt.id, "name": nxt.name, "handle": nxt.handle},
+                "pool_size": len(pool),
+            })
+        return out
+
 
 class ExternalScheduleSource:
     """PagerDuty/Opsgenie-shaped adapter.
@@ -140,8 +158,15 @@ def _parse_oncalls(data: dict, schedule_tier_map: dict[str, str]) -> list[OnCall
     return list(out.values())
 
 
-def build_schedule_source(settings: Settings, default_roster: list[OnCallEngineer]) -> ScheduleSource:
+def build_schedule_source(
+    settings: Settings, default_roster: list[OnCallEngineer],
+    pools: dict[EscalationTier, list[OnCallEngineer]] | None = None,
+) -> ScheduleSource:
     static = StaticScheduleSource(default_roster)
     if settings.oncall_api_url and settings.oncall_api_token:
         return ExternalScheduleSource(settings, fallback=static)
+    if settings.oncall_rotation_enabled and pools:
+        return RotatingScheduleSource(
+            pools=pools, shift_seconds=settings.oncall_shift_hours * 3600,
+        )
     return static

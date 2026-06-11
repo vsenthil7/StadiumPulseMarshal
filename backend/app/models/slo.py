@@ -154,6 +154,9 @@ class BurnAlert(BaseModel):
     error_budget_consumed_pct: float
     message: str = ""
     on_call_targets: list[dict] = Field(default_factory=list)
+    acknowledged: bool = False
+    acked_by: str = ""
+    silenced: bool = False
     at: datetime = Field(default_factory=_utcnow)
 
 
@@ -161,3 +164,5 @@ class BurnAlertList(BaseModel):
     alerts: list[BurnAlert] = Field(default_factory=list)
     page_count: int = 0
     ticket_count: int = 0
+    acked_count: int = 0
+    silenced_count: int = 0

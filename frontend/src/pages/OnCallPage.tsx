@@ -11,7 +11,10 @@ interface OnCallData {
     steps: { tier: string; after_minutes: number; notify_channels: string[] }[];
   }[];
   burn_targets: Record<string, { name: string; tier: string; recipient: string; channels: string[] }[]>;
-  schedule?: { type: string; next_handoff_epoch?: number; now_epoch?: number };
+  schedule?: {
+    type: string; next_handoff_epoch?: number; now_epoch?: number;
+    rotation?: { tier: string; current: { name: string }; next: { name: string }; pool_size: number }[];
+  };
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -76,6 +79,25 @@ export function OnCallPage() {
           </table>
         </div>
       </div>
+
+      {data.schedule?.rotation && data.schedule.rotation.length > 0 && (
+        <div className="panel">
+          <header><h3>Rotation</h3></header>
+          <div className="body">
+            <ul className="rotation-list">
+              {data.schedule.rotation.map((r) => (
+                <li key={r.tier} className="rotation-row">
+                  <span className="sev-chip">{TIER_LABEL[r.tier] ?? r.tier}</span>
+                  <span><strong>{r.current.name}</strong> on-call</span>
+                  <span className="rotation-next">
+                    next: {r.next.name} (pool of {r.pool_size})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <header><h3>Burn-alert routing</h3></header>
