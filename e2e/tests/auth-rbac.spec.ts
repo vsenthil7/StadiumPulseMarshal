@@ -60,3 +60,40 @@ test.describe('Auth, roles, venues, sidebar', () => {
     await expect(page.getByTestId('login-submit')).toBeVisible();
   });
 });
+
+test.describe('Permission-gated actions (UI matches backend RBAC)', () => {
+  test('viewer sees read-only remediations, no approve button', async ({ page }) => {
+    await loginAs(page, 'viewer');
+    await page.getByTestId('nav-triage').click();
+    // A viewer must never see approve/reject affordances.
+    await expect(page.getByTestId('approve-btn')).toHaveCount(0);
+    await expect(page.getByTestId('reject-btn')).toHaveCount(0);
+    // Read-only note is shown instead where a pending remediation exists.
+    // (Tolerant: only assert if a remediation is present.)
+    const rems = page.getByTestId('remediation');
+    if (await rems.count()) {
+      await expect(page.getByTestId('rem-readonly').first()).toBeVisible();
+    }
+  });
+
+  test('responder sees approve/reject on a pending remediation', async ({ page }) => {
+    await loginAs(page, 'responder');
+    await page.getByTestId('nav-triage').click();
+    const rems = page.getByTestId('remediation');
+    if (await rems.count()) {
+      await expect(page.getByTestId('approve-btn').first()).toBeVisible();
+    }
+  });
+
+  test('viewer cannot toggle auto-approve (disabled)', async ({ page }) => {
+    await loginAs(page, 'viewer');
+    await page.getByTestId('nav-triage').click();
+    await expect(page.getByTestId('auto-approve-toggle')).toBeDisabled();
+  });
+
+  test('viewer on Incidents sees view-only, no create button', async ({ page }) => {
+    await loginAs(page, 'viewer');
+    await page.getByTestId('nav-incidents').click();
+    await expect(page.getByTestId('create-incident-btn')).toHaveCount(0);
+  });
+});

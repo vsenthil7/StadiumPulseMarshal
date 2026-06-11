@@ -1,20 +1,22 @@
 import type { AppConfig } from '../types';
+import { useCan } from '../lib/permissions';
 
 interface Props {
   config: AppConfig | null;
   autoApprove: boolean;
   onToggleAutoApprove: (v: boolean) => void;
   operator: string;
-  onOperatorChange: (v: string) => void;
 }
 
+// Operator identity is the signed-in user (read-only); the auto-approve
+// guardrail is a privileged setting gated on `settings:write`.
 export function SettingsPanel({
   config,
   autoApprove,
   onToggleAutoApprove,
   operator,
-  onOperatorChange,
 }: Props) {
+  const canWriteSettings = useCan('settings:write');
   return (
     <div className="panel" data-testid="settings-panel">
       <header>
@@ -27,13 +29,9 @@ export function SettingsPanel({
             <div className="hint">Recorded on every approval decision (audit).</div>
           </div>
         </div>
-        <input
-          className="field"
-          value={operator}
-          onChange={(e) => onOperatorChange(e.target.value)}
-          data-testid="operator-input"
-          aria-label="Operator identity"
-        />
+        <div className="field readonly" data-testid="operator-identity" aria-label="Operator identity">
+          {operator}
+        </div>
 
         <div className="toggle-row" style={{ marginTop: 12 }}>
           <div>
@@ -41,12 +39,14 @@ export function SettingsPanel({
             <div className="hint">
               When on, LOW-risk actions within the severity ceiling are applied
               without a click. High-impact actions always require you.
+              {!canWriteSettings && ' (Admin only.)'}
             </div>
           </div>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <input
               type="checkbox"
               checked={autoApprove}
+              disabled={!canWriteSettings}
               onChange={(e) => onToggleAutoApprove(e.target.checked)}
               data-testid="auto-approve-toggle"
             />

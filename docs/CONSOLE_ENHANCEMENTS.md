@@ -87,3 +87,48 @@ cd e2e && npm install && npx playwright test    # login/sidebar/venue/rbac (CI)
 > sandbox, so the e2e specs are authored/updated to run in CI. The runnable
 > `node:test` RBAC test and the backend suite are the in-sandbox proof; the live
 > stack (SPA + login + role-gated 403) was verified by hand.
+
+---
+
+## Round 2 — Enterprise hardening
+
+A review pass found and fixed genuine gaps (not cosmetics):
+
+### Venue-scoped authorization (was cosmetic, now enforced)
+- The `Principal` now carries `venues` + `all_venues`; the login JWT includes
+  these claims and `get_principal` resolves them.
+- New `require_venue_access` dependency enforces that a caller may only
+  list/create incidents within a venue they're scoped to. Cross-venue access is
+  **403** (proven by tests + live). Platform/admin principals are cross-venue.
+- New `GET /api/v1/venues` returns only the venues the caller can see.
+- New `GET /api/v1/auth/me` rehydrates a session from the token (used on refresh).
+
+### UI now matches backend RBAC (was: nav-only gating)
+Previously the sidebar hid pages by role but action buttons were always shown,
+so a viewer saw Approve/Execute the backend would 403. Now there is a reusable
+permission layer — `lib/permissions.tsx` (`useCan`, `<Can>`,
+`<RequirePermission>`) — and every privileged affordance is gated:
+
+| Action | Permission |
+|--------|-----------|
+| Approve / Reject / Apply remediation | `remediation:approve` |
+| Incident transition / escalate / open | `incident:write` |
+| Change scenario | `scenario:write` |
+| Toggle auto-approve guardrail | `settings:write` |
+
+A viewer now sees clear read-only notes instead of dead buttons.
+
+### Session-expiry handling
+Both HTTP layers detect **401** and clear the session, returning the user to the
+login gate instead of failing silently.
+
+### Modularisation (no single-file dumping)
+- `lib/auth.tsx` (245 lines) → `lib/auth/{index,types,session-store,seed-auth,live-auth}`.
+- Shell chrome → `components/shell/{Sidebar,TopBar,VenueSwitcher,UserMenu,HealthPill}`.
+- `App.tsx` reduced from 207 → 90 lines (composition only).
+
+### Tests
+- Backend **232 pass** (incl. venue authz + cross-venue 403 + `/auth/me` +
+  `/venues` scoping).
+- Frontend **7 runnable RBAC unit tests** (`node --test src/lib/rbac.test.ts`).
+- e2e extended with permission-gating assertions (run in CI).

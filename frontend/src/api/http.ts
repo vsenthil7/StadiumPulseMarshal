@@ -16,6 +16,17 @@ export function setHttpAuthToken(token: string | null): void {
   _authToken = token;
 }
 
+// Session-expiry hook. The auth context registers a callback so a 401 (expired
+// or invalid token) clears the session and returns the user to the login gate,
+// rather than leaving them staring at silent failures.
+let _onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  _onUnauthorized = fn;
+}
+function notifyUnauthorized(): void {
+  if (_onUnauthorized) _onUnauthorized();
+}
+
 export interface ApiErrorShape {
   code: string;
   message: string;
@@ -102,6 +113,11 @@ export async function request<T>(
         /* non-JSON error body */
       }
       const err = new ApiError(res.status, envelope);
+      // 401 → session is no longer valid; clear it and bounce to login.
+      if (res.status === 401) {
+        notifyUnauthorized();
+        throw err;
+      }
       if (RETRIABLE_STATUS.has(res.status) && attempt < retries) {
         attempt += 1;
         await sleep(retryBaseMs * 2 ** (attempt - 1), signal);

@@ -618,3 +618,12 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .kv dd { margin: 0; font-size: 13px; }
 .mono { font-family: var(--font-mono); }
 .muted { color: var(--ink-3); font-size: 13px; }
+
+/* ---------- Permission gating affordances ---------- */
+.rem-readonly { font-size: 12px; color: var(--ink-3); font-style: italic; padding: 6px 0; }
+.field.readonly { background: var(--surface-2); color: var(--ink-2); cursor: default; user-select: text; }
+.perm-denied { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px;
+  background: rgba(200,135,15,.08); border: 1px solid rgba(200,135,15,.3);
+  border-radius: var(--radius-sm); color: var(--ink-2); }
+.perm-denied-icon { font-size: 18px; line-height: 1; }
+.perm-denied-sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }

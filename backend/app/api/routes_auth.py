@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
+from app.api.auth import get_principal
 from app.core.errors import UnauthorizedError
+from app.rbac.policy import Principal
 
 try:  # PyJWT is optional at runtime
     import jwt as _jwt
@@ -28,16 +30,17 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 DEMO_PASSWORD = "MatchdayDemo123!"
 
 # Mirror of the frontend demo matrix (lib/demo-users.ts): role × 2 venues.
+# ``all_venues`` marks cross-venue (platform/estate) principals.
 DEMO_USERS: dict[str, dict] = {
     "viewer@arena-north.demo": {"role": "viewer", "venue_id": "venue_arena_north", "name": "Viewer (demo)"},
     "operator@arena-north.demo": {"role": "operator", "venue_id": "venue_arena_north", "name": "Operator (demo)"},
     "responder@arena-north.demo": {"role": "responder", "venue_id": "venue_arena_north", "name": "Responder (demo)"},
-    "admin@arena-north.demo": {"role": "admin", "venue_id": "venue_arena_north", "name": "Admin (demo)"},
+    "admin@arena-north.demo": {"role": "admin", "venue_id": "venue_arena_north", "name": "Admin (demo)", "all_venues": True},
     "viewer@olympic-park.demo": {"role": "viewer", "venue_id": "venue_olympic_park", "name": "Viewer (demo)"},
     "operator@olympic-park.demo": {"role": "operator", "venue_id": "venue_olympic_park", "name": "Operator (demo)"},
     "responder@olympic-park.demo": {"role": "responder", "venue_id": "venue_olympic_park", "name": "Responder (demo)"},
-    "admin@olympic-park.demo": {"role": "admin", "venue_id": "venue_olympic_park", "name": "Admin (demo)"},
-    "sre@stadiumpulse.demo": {"role": "admin", "venue_id": "venue_arena_north", "name": "Platform SRE (demo)"},
+    "admin@olympic-park.demo": {"role": "admin", "venue_id": "venue_olympic_park", "name": "Admin (demo)", "all_venues": True},
+    "sre@stadiumpulse.demo": {"role": "admin", "venue_id": "venue_arena_north", "name": "Platform SRE (demo)", "all_venues": True},
 }
 
 # Fallback secret so the demo login works out-of-the-box when JWT_SECRET is
@@ -65,10 +68,12 @@ async def login(body: LoginIn, request: Request) -> dict:
     settings = request.app.state.ctx.settings
     claim = settings.jwt_roles_claim
     now = int(time.time())
+    all_venues = bool(user.get("all_venues"))
     payload = {
         "sub": body.email.lower(),
         claim: [user["role"]],
         "venue_id": user["venue_id"],
+        "all_venues": all_venues,
         "name": user["name"],
         "iat": now,
         "exp": now + 8 * 3600,
@@ -79,13 +84,44 @@ async def login(body: LoginIn, request: Request) -> dict:
 
     return {
         "token": token,
+        "user": _user_view(body.email.lower(), user),
+    }
+
+
+def _user_view(email: str, user: dict) -> dict:
+    return {
+        "subject": email,
+        "email": email,
+        "full_name": user["name"],
+        "role": user["role"],
+        "venue_id": user["venue_id"],
+        "all_venues": bool(user.get("all_venues")),
+    }
+
+
+@router.get("/me")
+async def me(
+    principal: Principal = Depends(get_principal),
+) -> dict:
+    """Rehydrate the current session from the presented token.
+
+    Lets the SPA restore identity on refresh without re-prompting. Resolves the
+    same Principal the rest of the API uses; 401 if the token is absent/invalid
+    (when auth is enabled).
+    """
+    # Map subject back to the demo directory when possible for a friendly view.
+    user = DEMO_USERS.get(principal.subject)
+    if user is not None:
+        return {"user": _user_view(principal.subject, user)}
+    return {
         "user": {
-            "subject": body.email.lower(),
-            "email": body.email.lower(),
-            "full_name": user["name"],
-            "role": user["role"],
-            "venue_id": user["venue_id"],
-        },
+            "subject": principal.subject,
+            "email": principal.subject,
+            "full_name": principal.subject,
+            "role": principal.roles[0].value if principal.roles else "viewer",
+            "venue_id": principal.venues[0] if principal.venues else None,
+            "all_venues": principal.all_venues,
+        }
     }
 
 

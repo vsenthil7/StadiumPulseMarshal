@@ -60,11 +60,19 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
 
 
 class Principal(BaseModel):
-    """An authenticated identity with roles."""
+    """An authenticated identity with roles and venue scope.
+
+    ``venues`` is the set of venue ids the principal may act within. An empty
+    list combined with ``all_venues=True`` denotes a cross-venue (platform)
+    principal — e.g. an SRE or admin who operates across the estate. This keeps
+    venue authorization a first-class concern rather than a client-side cosmetic.
+    """
 
     subject: str
     roles: list[Role] = Field(default_factory=list)
     auth_method: str = "none"
+    venues: list[str] = Field(default_factory=list)
+    all_venues: bool = False
 
     @property
     def permissions(self) -> set[Permission]:
@@ -75,6 +83,19 @@ class Principal(BaseModel):
 
     def has(self, permission: Permission) -> bool:
         return permission in self.permissions
+
+    def can_access_venue(self, venue_id: str | None) -> bool:
+        """True if the principal may act within ``venue_id``.
+
+        A ``None`` venue (estate-wide / unscoped resource) is always allowed.
+        Cross-venue principals may access any venue. Otherwise the venue must be
+        in the principal's allowed set.
+        """
+        if venue_id is None:
+            return True
+        if self.all_venues:
+            return True
+        return venue_id in self.venues
 
 
 def roles_from_names(names: list[str]) -> list[Role]:
@@ -88,7 +109,9 @@ def roles_from_names(names: list[str]) -> list[Role]:
     return out
 
 
-# When auth is disabled, requests act as a full-access admin so the demo works.
+# When auth is disabled, requests act as a full-access, cross-venue admin so
+# the demo works unguarded.
 ANONYMOUS_ADMIN = Principal(
-    subject="anonymous", roles=[Role.ADMIN], auth_method="disabled"
+    subject="anonymous", roles=[Role.ADMIN], auth_method="disabled",
+    all_venues=True,
 )

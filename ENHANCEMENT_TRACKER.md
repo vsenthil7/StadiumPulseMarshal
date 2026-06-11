@@ -64,3 +64,71 @@ one.
     new nav, plus a new `auth-rbac.spec.ts` (browsers BLOCKED-ENV in sandbox →
     run in CI). Frontend `tsc -b` + `vite build` green (60 modules). Live stack
     verified: SPA served, login works, viewer 403 on settings.
+
+---
+
+## Round 2 — Enterprise hardening (reviewer-driven depth)
+
+Triggered by review: "are you really happy with this as enterprise grade?".
+Audit found genuine gaps below. Scope is NOT shrunk — backend depth + matching
+frontend, modularised (no single-file dumping).
+
+### Findings (what a reviewer would flag)
+- F1. Frontend gates **nav** by role but **not action buttons** by permission —
+  a viewer sees Approve/Execute the backend will 403. Inconsistent.
+- F2. **Venue is cosmetic for authz**: Principal carries no venue; backend never
+  enforces a user may only act within their venue(s). No `/auth/me`.
+- F3. No **`/api/v1/venues`** endpoint; frontend hardcodes venues.
+- F4. Frontend HTTP layer ignores **401/403** (no session-expiry redirect / clean
+  forbidden surfacing).
+- F5. No server-side **venue-scope authorization** dependency.
+- F6. No reusable frontend **permission primitives** (`useCan`, `<Can>`,
+  `<RequirePermission>`), so gating would be ad-hoc and inconsistent.
+- F7. RBAC policy lacks **venue-scoped principals** + tests for them.
+
+### Sprints
+| # | Sprint | Status |
+|---|--------|--------|
+| R1 | Backend: Principal gains venue scope (claims+policy) + unit tests | 🟢 |
+| R2 | Backend: `/api/v1/auth/me` (rehydrate) + venue claim in login JWT | 🟢 |
+| R3 | Backend: `/api/v1/venues` (list, principal-scoped) module + tests | 🟢 |
+| R4 | Backend: `require_venue` authz dependency; apply to incident routes | 🟢 |
+| R5 | Backend: tests for venue authz (cross-venue 403) + full suite green | 🟢 |
+| R6 | Frontend: permission primitives module (useCan, <Can>, <RequirePermission>) | 🟢 |
+| R7 | Frontend: gate action buttons (approve/reject/execute/scenario/settings) | 🟢 |
+| R8 | Frontend: 401/403 handling in http layer → session expiry + toast | 🟢 |
+| R9 | Frontend: venues from `/venues` (live) w/ seed fallback; me-rehydrate | 🟢 |
+| R10 | Frontend: split big files into modules (auth, App shell, client) | 🟢 |
+| R11 | Tests (backend + node rbac) green; tsc/build green; e2e updated | 🟢 |
+| R12 | Docs + package | 🟢 |
+
+### Round 2 changelog
+- **R1–R5 (backend):** Principal gained venue scope (`venues`/`all_venues`);
+  JWTs carry venue claims; new `/api/v1/auth/me` (rehydrate) and
+  `/api/v1/venues` (principal-scoped); `require_venue_access` dependency applied
+  to incident list/create. **+7 tests** (cross-venue 403 proven). Suite 232 green.
+- **R6 (frontend):** reusable permission primitives `lib/permissions.tsx`
+  (`useCan`, `<Can>`, `<RequirePermission>`).
+- **R7:** action buttons now permission-gated to match the backend —
+  RemediationCard (approve/reject/execute → `remediation:approve`),
+  IncidentLifecycle (transition/escalate → `incident:write`), IncidentsPage
+  (create → `incident:write`), ScenariosPage (`scenario:write`), SettingsPanel
+  (auto-approve → `settings:write`, operator now read-only from session).
+- **R8:** HTTP layers (`http.ts` + `client.ts`) now handle **401** → clear
+  session → return to login gate, via an unauthorized handler the auth context
+  registers.
+- **R9:** venue switcher consumes live `/venues` (seed fallback); session
+  rehydrates via `/auth/me` on refresh.
+- **R10 (modularisation):** monolithic `auth.tsx` split into
+  `lib/auth/{index,types,session-store,seed-auth,live-auth}`; shell chrome
+  extracted to `components/shell/{Sidebar,TopBar,VenueSwitcher,UserMenu,HealthPill}`;
+  `App.tsx` 207 → 90 lines.
+- **R11:** frontend `tsc -b` + `vite build` green; 7 runnable RBAC unit tests
+  pass; e2e extended with permission-gating assertions (viewer has no
+  approve/create, disabled auto-approve). Browsers BLOCKED-ENV → e2e runs in CI.
+- **R12:** docs + package.
+- **Verified live:** SPA served; `/auth/me` rehydrates; `/venues` scoped
+  (operator 1, platform 2); operator cross-venue list **403**; viewer settings
+  **403**; responder approve **200**.
+
+### Round 2 — COMPLETE

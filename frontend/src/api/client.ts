@@ -20,6 +20,13 @@ export function getAuthToken(): string | null {
   return _authToken;
 }
 
+// Session-expiry hook (shared concept with http.ts). The auth context registers
+// a callback so any 401 clears the session and returns to the login gate.
+let _onUnauthorized: (() => void) | null = null;
+export function setClientUnauthorizedHandler(fn: (() => void) | null): void {
+  _onUnauthorized = fn;
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: {
@@ -29,6 +36,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
+    if (res.status === 401 && _onUnauthorized) _onUnauthorized();
     throw new Error(`API ${res.status}: ${path}`);
   }
   return (await res.json()) as T;
@@ -280,4 +288,8 @@ export const systemApi = {
   health: () => http<HealthInfo>('/health'),
   ready: () => http<ReadyInfo>('/ready'),
   config: () => http<import('../types').AppConfig>('/config'),
+  venues: () =>
+    http<{ venues: { id: string; name: string; city: string; capacity: number }[]; all_venues: boolean }>(
+      '/venues',
+    ),
 };

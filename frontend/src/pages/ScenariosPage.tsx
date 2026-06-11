@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiExt } from '../api/client';
 import type { ScenarioInfo } from '../types';
 import { ScenarioSwitcher } from '../components/ScenarioSwitcher';
+import { RequirePermission } from '../lib/permissions';
 
 export function ScenariosPage({
   onScenarioChange,
@@ -47,12 +48,14 @@ export function ScenariosPage({
           Switch the active matchday situation. Changing scenario updates the
           problem feed, root-cause data and SLOs across the console.
         </p>
-        <ScenarioSwitcher
-          scenarios={scenarios}
-          active={active}
-          onSelect={select}
-          busy={busy}
-        />
+        <RequirePermission permission="scenario:write" label="Changing scenarios requires an operator.">
+          <ScenarioSwitcher
+            scenarios={scenarios}
+            active={active}
+            onSelect={select}
+            busy={busy}
+          />
+        </RequirePermission>
       </div>
     </div>
   );

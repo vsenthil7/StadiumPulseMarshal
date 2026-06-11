@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
-from app.api.auth import require_permission
-from app.rbac.policy import Permission
+from app.api.auth import require_permission, require_venue_access
+from app.rbac.policy import Permission, Principal
 from app.api.schemas_ext import (
     AssignRequest,
     CreateIncidentRequest,
@@ -31,9 +31,12 @@ async def list_incidents(
     venue_id: str | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    _p=Depends(require_permission(Permission.INCIDENT_READ)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> IncidentListResponse:
     ctx = _ctx(request)
+    # If a venue filter is supplied, the caller must be scoped to it.
+    if venue_id is not None:
+        require_venue_access(principal, venue_id)
     incidents = await ctx.incidents.list(
         open_only=open_only, venue_id=venue_id, offset=offset, limit=limit
     )
@@ -48,9 +51,11 @@ async def create_incident(
     request: Request,
     body: CreateIncidentRequest,
     idempotency_key: str | None = Header(default=None),
-    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
+    principal: Principal = Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
+    # A principal may only create incidents within a venue it can access.
+    require_venue_access(principal, body.venue_id)
     # Idempotent replay: same key returns the stored response, no new incident.
     if idempotency_key:
         cached = ctx.idempotency.get("incident:create", idempotency_key)

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { RemediationAction } from '../types';
+import { useCan } from '../lib/permissions';
 
 interface Props {
   action: RemediationAction;
@@ -20,6 +21,7 @@ export function RemediationCard({
   busy,
 }: Props) {
   const [reason, setReason] = useState('');
+  const canApprove = useCan('remediation:approve');
   const decided = DECIDED.includes(action.status);
   const approved = APPROVED.includes(action.status);
   const pending = !decided && !approved;
@@ -43,7 +45,7 @@ export function RemediationCard({
         ))}
       </ol>
 
-      {pending && (
+      {pending && canApprove && (
         <>
           <input
             className="field"
@@ -72,6 +74,12 @@ export function RemediationCard({
           </div>
         </>
       )}
+      {pending && !canApprove && (
+        <div className="rem-readonly" data-testid="rem-readonly">
+          Awaiting a responder’s decision — your role can view but not approve
+          remediations.
+        </div>
+      )}
       {approved && (
         <div className="hitl-actions">
           <span className={`status-chip ${action.status}`} data-testid="decided-status">
@@ -79,14 +87,20 @@ export function RemediationCard({
               ? 'Auto-approved by guardrail'
               : 'Approved'}
           </span>
-          <button
-            className="btn primary"
-            disabled={busy}
-            onClick={() => onExecute(action.id)}
-            data-testid="execute-btn"
-          >
-            Apply runbook
-          </button>
+          {canApprove ? (
+            <button
+              className="btn primary"
+              disabled={busy}
+              onClick={() => onExecute(action.id)}
+              data-testid="execute-btn"
+            >
+              Apply runbook
+            </button>
+          ) : (
+            <span className="rem-readonly" data-testid="rem-readonly">
+              Apply requires a responder.
+            </span>
+          )}
         </div>
       )}
       {decided && (

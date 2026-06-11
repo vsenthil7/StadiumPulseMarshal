@@ -1,5 +1,6 @@
 import type { Incident, IncidentState } from '../types';
 import { fmtTime } from '../utils/format';
+import { useCan } from '../lib/permissions';
 
 const NEXT_STATES: Record<IncidentState, IncidentState[]> = {
   DETECTED: ['ACKNOWLEDGED', 'INVESTIGATING'],
@@ -24,6 +25,7 @@ export function IncidentLifecycle({
   onEscalate,
   busy,
 }: Props) {
+  const canWrite = useCan('incident:write');
   const nexts = NEXT_STATES[incident.state] ?? [];
   return (
     <div data-testid="incident-lifecycle">
@@ -35,27 +37,33 @@ export function IncidentLifecycle({
             <span className="assignee">@{incident.assignee}</span>
           )}
         </div>
-        <div className="hitl-actions">
-          {nexts.map((t) => (
+        {canWrite ? (
+          <div className="hitl-actions">
+            {nexts.map((t) => (
+              <button
+                key={t}
+                className="btn"
+                disabled={busy}
+                onClick={() => onTransition(t)}
+                data-testid={`transition-${t}`}
+              >
+                → {t}
+              </button>
+            ))}
             <button
-              key={t}
               className="btn"
               disabled={busy}
-              onClick={() => onTransition(t)}
-              data-testid={`transition-${t}`}
+              onClick={onEscalate}
+              data-testid="escalate-btn"
             >
-              → {t}
+              Escalate
             </button>
-          ))}
-          <button
-            className="btn"
-            disabled={busy}
-            onClick={onEscalate}
-            data-testid="escalate-btn"
-          >
-            Escalate
-          </button>
-        </div>
+          </div>
+        ) : (
+          <span className="rem-readonly" data-testid="lifecycle-readonly">
+            Read-only — incident actions require an operator.
+          </span>
+        )}
       </div>
 
       <ol className="incident-timeline" data-testid="incident-timeline">

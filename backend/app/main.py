@@ -72,6 +72,7 @@ def create_app() -> FastAPI:
     from app.api.routes_incidents import router as incidents_router
     from app.api.routes_observability import router as obs_router
     from app.api.routes_ops import router as ops_router
+    from app.api.routes_venues import router as venues_router
     from app.api.routes_webhooks import router as webhooks_router
 
     app.include_router(incidents_router)
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(audit_router)
     app.include_router(auth_router)
+    app.include_router(venues_router)
 
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:

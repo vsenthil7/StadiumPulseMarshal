@@ -16,10 +16,9 @@ import { fmtTime, phaseLabel, pct } from '../utils/format';
 
 interface TriageProps {
   operator: string;
-  setOperator: (v: string) => void;
 }
 
-export function TriagePage({ operator, setOperator }: TriageProps) {
+export function TriagePage({ operator }: TriageProps) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
@@ -287,7 +286,6 @@ export function TriagePage({ operator, setOperator }: TriageProps) {
                 autoApprove={autoApprove}
                 onToggleAutoApprove={handleToggleAutoApprove}
                 operator={operator}
-                onOperatorChange={setOperator}
               />
 
               <div className="panel" data-testid="audit-panel">

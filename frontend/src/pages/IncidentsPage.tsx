@@ -4,9 +4,11 @@ import { ApiError } from '../api/http';
 import type { Incident, IncidentState, Postmortem, Problem } from '../types';
 import { IncidentLifecycle } from '../components/IncidentLifecycle';
 import { useToast } from '../store/ToastStore';
+import { useCan } from '../lib/permissions';
 import { fmtTime } from '../utils/format';
 
 export function IncidentsPage({ operator }: { operator: string }) {
+  const canWrite = useCan('incident:write');
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [selected, setSelected] = useState<Incident | null>(null);
@@ -137,14 +139,20 @@ export function IncidentsPage({ operator }: { operator: string }) {
           {problems.map((p) => (
             <div className="problem-pick" key={p.id}>
               <span>{p.title}</span>
-              <button
-                className="btn primary"
-                disabled={busy}
-                onClick={() => createFrom(p.id)}
-                data-testid="create-incident-btn"
-              >
-                Open incident
-              </button>
+              {canWrite ? (
+                <button
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => createFrom(p.id)}
+                  data-testid="create-incident-btn"
+                >
+                  Open incident
+                </button>
+              ) : (
+                <span className="rem-readonly" data-testid="create-incident-readonly">
+                  view only
+                </span>
+              )}
             </div>
           ))}
         </div>

@@ -15,6 +15,7 @@ from app.rbac.policy import (
     ANONYMOUS_ADMIN,
     Permission,
     Principal,
+    Role,
     roles_from_names,
 )
 
@@ -40,6 +41,30 @@ def _claim_roles(claims: dict, claim_name: str) -> list[str]:
     if isinstance(raw, list):
         return [str(r) for r in raw]
     return []
+
+
+def _venue_scope(claims: dict, roles: list[Role]) -> tuple[list[str], bool]:
+    """Derive a principal's venue scope from JWT claims.
+
+    Recognised claims: ``all_venues`` (bool) and ``venues`` (list) or a single
+    ``venue_id``. Admins are treated as cross-venue by default (estate-wide
+    operators) unless a claim narrows them.
+    """
+    if claims.get("all_venues") is True:
+        return [], True
+    venues: list[str] = []
+    raw = claims.get("venues")
+    if isinstance(raw, list):
+        venues = [str(v) for v in raw]
+    elif isinstance(raw, str) and raw:
+        venues = [v.strip() for v in raw.split(",") if v.strip()]
+    single = claims.get("venue_id")
+    if single and single not in venues:
+        venues.append(str(single))
+    # Admins default to cross-venue unless explicitly scoped to a venue list.
+    if Role.ADMIN in roles and not venues:
+        return [], True
+    return venues, False
 
 
 async def get_principal(
@@ -76,10 +101,14 @@ async def get_principal(
             except UnauthorizedError:
                 continue
             roles = _claim_roles(claims, settings.jwt_roles_claim)
+            resolved = roles_from_names(roles)
+            venues, all_venues = _venue_scope(claims, resolved)
             return Principal(
                 subject=str(claims.get("sub", "jwt-user")),
-                roles=roles_from_names(roles),
+                roles=resolved,
                 auth_method="jwt",
+                venues=venues,
+                all_venues=all_venues,
             )
         # A token was presented but did not verify under any known secret.
         raise UnauthorizedError("Invalid token")
@@ -102,6 +131,20 @@ def require_permission(permission: Permission) -> Callable:
         return principal
 
     return _dep
+
+
+def require_venue_access(principal: Principal, venue_id: str | None) -> None:
+    """Raise 403 if the principal may not act within ``venue_id``.
+
+    Centralises venue-scope enforcement so routes that accept a ``venue_id``
+    (query or body) can authorize it consistently. A ``None`` venue is allowed
+    (estate-wide / unscoped resource).
+    """
+    if not principal.can_access_venue(venue_id):
+        raise ForbiddenError(
+            "Venue not in principal scope",
+            details={"venue_id": venue_id or ""},
+        )
 
 
 # Backwards-compatible alias: authentication only (no specific permission).
