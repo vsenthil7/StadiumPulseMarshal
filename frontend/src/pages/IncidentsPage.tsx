@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, apiExt } from '../api/client';
-import type { Incident, IncidentState, Problem } from '../types';
+import { api, apiExt, apiP3 } from '../api/client';
+import type { Incident, IncidentState, Postmortem, Problem } from '../types';
 import { IncidentLifecycle } from '../components/IncidentLifecycle';
+import { useToast } from '../store/ToastStore';
 import { fmtTime } from '../utils/format';
 
 export function IncidentsPage({ operator }: { operator: string }) {
@@ -9,6 +10,8 @@ export function IncidentsPage({ operator }: { operator: string }) {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [selected, setSelected] = useState<Incident | null>(null);
   const [busy, setBusy] = useState(false);
+  const [postmortem, setPostmortem] = useState<Postmortem | null>(null);
+  const { notify } = useToast();
 
   const refresh = useCallback(async () => {
     const res = await apiExt.listIncidents({ limit: 100 });
@@ -47,12 +50,23 @@ export function IncidentsPage({ operator }: { operator: string }) {
         const inc = await apiExt.transition(selected.id, target, operator);
         setSelected(inc);
         await refresh();
+        notify(`Incident → ${target}`, 'success');
       } finally {
         setBusy(false);
       }
     },
-    [selected, operator, refresh],
+    [selected, operator, refresh, notify],
   );
+
+  const loadPostmortem = useCallback(async () => {
+    if (!selected) return;
+    try {
+      const pm = await apiP3.getPostmortem(selected.id);
+      setPostmortem(pm);
+    } catch {
+      notify('Could not generate postmortem', 'error');
+    }
+  }, [selected, notify]);
 
   const escalate = useCallback(async () => {
     if (!selected) return;
@@ -128,6 +142,22 @@ export function IncidentsPage({ operator }: { operator: string }) {
               onEscalate={escalate}
               busy={busy}
             />
+            <div className="hitl-actions" style={{ marginTop: 14 }}>
+              <button
+                className="btn"
+                onClick={loadPostmortem}
+                data-testid="postmortem-btn"
+              >
+                Generate postmortem
+              </button>
+            </div>
+            {postmortem && postmortem.incident_id === selected.id && (
+              <div className="postmortem" data-testid="postmortem">
+                <h4>Postmortem</h4>
+                <p className="postmortem-summary">{postmortem.summary}</p>
+                <pre className="postmortem-md">{postmortem.markdown}</pre>
+              </div>
+            )}
           </div>
         </div>
       )}

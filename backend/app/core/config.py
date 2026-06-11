@@ -49,10 +49,25 @@ class Settings(BaseSettings):
     # e.g. "sqlite+aiosqlite:///stadiumpulse.db"; empty => in-memory.
     database_url: str | None = None
 
+    # --- Rate limiting ---
+    rate_limit_enabled: bool = Field(default=False)
+    rate_limit_per_minute: int = Field(default=120)
+
+    # --- Webhooks ---
+    webhook_timeout_seconds: float = Field(default=5.0)
+
     # --- Auth ---
     api_key: str | None = None
     jwt_secret: str | None = None
     auth_enabled: bool = Field(default=False)
+    # Comma-separated roles granted to a valid API key (default: admin).
+    api_key_roles: str = Field(default="admin")
+    # JWT claim that carries a list (or comma string) of role names.
+    jwt_roles_claim: str = Field(default="roles")
+
+    @property
+    def api_key_role_list(self) -> list[str]:
+        return [r.strip() for r in self.api_key_roles.split(",") if r.strip()]
 
     @property
     def dynatrace_live(self) -> bool:

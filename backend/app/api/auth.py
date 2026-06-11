@@ -1,47 +1,92 @@
-"""Authentication dependencies.
+"""Authentication + authorization dependencies.
 
-When ``auth_enabled`` is set, endpoints require either a matching ``X-API-Key``
-header or a valid Bearer JWT signed with ``jwt_secret``. When disabled (default
-for the demo), all requests pass. Kept as a FastAPI dependency so it composes.
+Resolves a request to an RBAC ``Principal`` (API key or JWT), and provides a
+``require_permission`` factory for route-level authorization. When auth is
+disabled the request acts as a full-access admin so the demo runs unguarded.
 """
 from __future__ import annotations
 
-from fastapi import Header, HTTPException, Request
+from collections.abc import Callable
+
+from fastapi import Depends, Header, Request
+
+from app.core.errors import ForbiddenError, UnauthorizedError
+from app.rbac.policy import (
+    ANONYMOUS_ADMIN,
+    Permission,
+    Principal,
+    roles_from_names,
+)
 
 try:  # PyJWT is optional at runtime
     import jwt as _jwt
-except Exception:  # pragma: no cover - jwt always present in this env
+except Exception:  # pragma: no cover
     _jwt = None  # type: ignore
 
 
 def _decode_jwt(token: str, secret: str) -> dict:
     if _jwt is None:  # pragma: no cover
-        raise HTTPException(status_code=500, detail="JWT support unavailable")
+        raise UnauthorizedError("JWT support unavailable")
     try:
         return _jwt.decode(token, secret, algorithms=["HS256"])
-    except Exception as exc:  # pragma: no cover - exercised via wrong token test
-        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    except Exception as exc:
+        raise UnauthorizedError("Invalid token") from exc
 
 
-async def require_auth(
+def _claim_roles(claims: dict, claim_name: str) -> list[str]:
+    raw = claims.get(claim_name, [])
+    if isinstance(raw, str):
+        return [r.strip() for r in raw.split(",") if r.strip()]
+    if isinstance(raw, list):
+        return [str(r) for r in raw]
+    return []
+
+
+async def get_principal(
     request: Request,
     x_api_key: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
-) -> dict:
-    """Authorise a request. Returns a principal dict (or {} when auth is off)."""
+) -> Principal:
+    """Resolve the current principal (or raise 401)."""
     settings = request.app.state.ctx.settings
     if not settings.auth_enabled:
-        return {"principal": "anonymous", "auth": "disabled"}
+        return ANONYMOUS_ADMIN
 
-    # API key path.
     if settings.api_key and x_api_key == settings.api_key:
-        return {"principal": "api-key", "auth": "api_key"}
+        return Principal(
+            subject="api-key",
+            roles=roles_from_names(settings.api_key_role_list),
+            auth_method="api_key",
+        )
 
-    # JWT path.
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1]
         if settings.jwt_secret:
             claims = _decode_jwt(token, settings.jwt_secret)
-            return {"principal": claims.get("sub", "jwt-user"), "auth": "jwt"}
+            roles = _claim_roles(claims, settings.jwt_roles_claim)
+            return Principal(
+                subject=str(claims.get("sub", "jwt-user")),
+                roles=roles_from_names(roles),
+                auth_method="jwt",
+            )
 
-    raise HTTPException(status_code=401, detail="Authentication required")
+    raise UnauthorizedError("Authentication required")
+
+
+def require_permission(permission: Permission) -> Callable:
+    """Dependency factory enforcing a permission on the resolved principal."""
+
+    async def _dep(principal: Principal = Depends(get_principal)) -> Principal:
+        if not principal.has(permission):
+            raise ForbiddenError(
+                f"Missing permission: {permission.value}",
+                details={"required": permission.value},
+            )
+        return principal
+
+    return _dep
+
+
+# Backwards-compatible alias: authentication only (no specific permission).
+async def require_auth(principal: Principal = Depends(get_principal)) -> Principal:
+    return principal

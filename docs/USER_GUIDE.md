@@ -215,3 +215,59 @@ updates the problem feed, root-cause data and SLOs across every tab.
 - **Authentication.** Set `AUTH_ENABLED=true` plus `API_KEY` and/or
   `JWT_SECRET`. Then send `X-API-Key: <key>` or `Authorization: Bearer <jwt>`
   on API calls. Left off by default for the demo.
+
+---
+
+## 12. Phase 3 — Webhooks, live feed, postmortems, trends
+
+### Webhooks tab
+Register external endpoints to receive incident/SLO events.
+
+1. Open the **Webhooks** tab.
+2. Enter an endpoint URL, optionally tick the event types to receive (leave all
+   unticked for every event), and click **Register webhook**.
+3. Registered webhooks show their last delivery status and failure count.
+   Delete with the **Delete** button.
+
+Events emitted: `incident.created`, `incident.state_changed`,
+`incident.escalated`, `incident.assigned`, `remediation.decided`,
+`slo.breached`.
+
+### Live feed indicator
+The top bar shows a live indicator (`live (N)` / `offline`) backed by a
+WebSocket to `/api/v1/stream`. It reflects the current open-problem count and
+reconnects automatically.
+
+### Postmortems
+On the **Incidents** tab, open an incident and click **Generate postmortem** to
+produce a structured postmortem (summary, metrics, timeline, remediations) with
+a markdown export you can copy.
+
+### SLO trends
+The **Reliability** tab now includes burn-rate trend sparklines per SLO with
+direction (improving / worsening / stable) and aggregate stats.
+
+---
+
+## 13. Operations reference (Phase 3)
+
+### Health & metrics
+- `GET /api/v1/health` — liveness probe.
+- `GET /api/v1/ready` — readiness with dependency states.
+- `GET /api/v1/metrics` — Prometheus exposition (scrape target).
+
+### RBAC
+Set `AUTH_ENABLED=true`. Roles: `viewer` (read), `operator` (+ incident write,
+scenarios), `responder` (+ remediation approve), `admin` (all, incl. webhooks).
+- API key: set `API_KEY`; granted roles via `API_KEY_ROLES` (default `admin`).
+- JWT: set `JWT_SECRET`; roles read from the `JWT_ROLES_CLAIM` claim
+  (default `roles`).
+
+### Rate limiting
+`RATE_LIMIT_ENABLED=true` with `RATE_LIMIT_PER_MINUTE` (default 120). Over-limit
+returns `429` with a `Retry-After` header. `/metrics`, `/health` and `/ready`
+are never throttled.
+
+### Tracing
+Every response includes an `X-Request-ID`. Send your own to correlate across
+systems; it is echoed back and attached to logs and error envelopes.

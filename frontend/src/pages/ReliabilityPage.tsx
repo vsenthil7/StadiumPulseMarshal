@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
-import { apiExt } from '../api/client';
-import type { AnalyticsSummary, ErrorBudget } from '../types';
+import { apiExt, apiP3 } from '../api/client';
+import type { AnalyticsSummary, ErrorBudget, SLOTrend } from '../types';
 import { SLODashboard } from '../components/SLODashboard';
 import { AnalyticsPanel } from '../components/AnalyticsPanel';
+import { SLOTrends } from '../components/SLOTrends';
 
 export function ReliabilityPage() {
   const [budgets, setBudgets] = useState<ErrorBudget[]>([]);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [trends, setTrends] = useState<SLOTrend[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    Promise.all([apiExt.getSLO(), apiExt.getAnalytics()])
-      .then(([b, s]) => {
+    Promise.all([apiExt.getSLO(), apiExt.getAnalytics(), apiP3.getSLOTrends()])
+      .then(([b, s, t]) => {
         if (!active) return;
         setBudgets(b);
         setSummary(s);
+        setTrends(t);
       })
       .finally(() => active && setLoading(false));
     return () => {
@@ -40,6 +43,14 @@ export function ReliabilityPage() {
         </header>
         <div className="body">
           <SLODashboard budgets={budgets} />
+        </div>
+      </div>
+      <div className="panel">
+        <header>
+          <h3>SLO burn-rate trends</h3>
+        </header>
+        <div className="body">
+          <SLOTrends trends={trends} />
         </div>
       </div>
       <div className="panel">

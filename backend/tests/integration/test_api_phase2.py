@@ -138,10 +138,10 @@ def test_auth_api_key():
 def test_auth_jwt():
     gen = _auth_app(api_key="secret", jwt_secret="js")
     c = next(gen)
-    tok = jwt.encode({"sub": "alice"}, "js", algorithm="HS256")
+    tok = jwt.encode({"sub": "alice", "roles": ["admin"]}, "js", algorithm="HS256")
     assert c.get("/api/v1/incidents",
                  headers={"Authorization": f"Bearer {tok}"}).status_code == 200
-    bad = jwt.encode({"sub": "x"}, "wrong", algorithm="HS256")
+    bad = jwt.encode({"sub": "x", "roles": ["admin"]}, "wrong", algorithm="HS256")
     assert c.get("/api/v1/incidents",
                  headers={"Authorization": f"Bearer {bad}"}).status_code == 401
     # bearer with no jwt_secret configured -> 401

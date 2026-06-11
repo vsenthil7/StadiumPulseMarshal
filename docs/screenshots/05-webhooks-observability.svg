@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="'IBM Plex Sans', Segoe UI, sans-serif">
+  <rect width="1200" height="720" fill="#f4f6f9"/>
+  <!-- topbar with tabs + live indicator -->
+  <rect width="1200" height="55" fill="#ffffff"/>
+  <line x1="0" y1="55" x2="1200" y2="55" stroke="#e2e7ee"/>
+  <rect x="20" y="13" width="30" height="30" rx="8" fill="#0b6e4f"/>
+  <text x="35" y="33" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">SP</text>
+  <text x="61" y="34" fill="#11202e" font-size="15" font-weight="700">StadiumPulse Marshal</text>
+  <text x="300" y="34" fill="#7387a0" font-size="13" font-weight="600">Triage</text>
+  <text x="365" y="34" fill="#7387a0" font-size="13" font-weight="600">Incidents</text>
+  <text x="450" y="34" fill="#7387a0" font-size="13" font-weight="600">Reliability</text>
+  <text x="540" y="34" fill="#7387a0" font-size="13" font-weight="600">Scenarios</text>
+  <rect x="625" y="16" width="86" height="26" rx="7" fill="#eef5f1"/>
+  <text x="668" y="34" fill="#08543c" font-size="13" font-weight="700" text-anchor="middle">Webhooks</text>
+  <text x="900" y="34" fill="#2f8f5b" font-size="11" font-weight="600" font-family="'IBM Plex Mono', monospace">● live (3)</text>
+  <rect x="1004" y="15" width="180" height="25" rx="12" fill="#fafbfc" stroke="#cbd4e0"/>
+  <circle cx="1020" cy="27" r="3.5" fill="#c8870f"/>
+  <text x="1032" y="31" fill="#43566a" font-size="11" font-weight="600" font-family="'IBM Plex Mono', monospace">MOCK · mock</text>
+
+  <!-- register panel -->
+  <rect x="20" y="75" width="1160" height="225" rx="10" fill="#ffffff" stroke="#e2e7ee"/>
+  <rect x="20" y="75" width="1160" height="40" rx="10" fill="#fafbfc"/>
+  <rect x="20" y="101" width="1160" height="14" fill="#fafbfc"/>
+  <line x1="20" y1="115" x2="1180" y2="115" stroke="#e2e7ee"/>
+  <text x="36" y="100" fill="#43566a" font-size="13" font-weight="600">Register webhook</text>
+  <rect x="40" y="132" width="1120" height="38" rx="7" fill="#ffffff" stroke="#cbd4e0"/>
+  <text x="54" y="156" fill="#7387a0" font-size="13" font-family="'IBM Plex Mono', monospace">https://your-endpoint.example/hook</text>
+  <!-- event type checkboxes -->
+  <g font-size="12" font-family="'IBM Plex Mono', monospace" fill="#43566a">
+    <rect x="40" y="186" width="14" height="14" rx="3" fill="#0b6e4f"/><text x="62" y="197">incident.created</text>
+    <rect x="240" y="186" width="14" height="14" rx="3" fill="#0b6e4f"/><text x="262" y="197">incident.state_changed</text>
+    <rect x="480" y="186" width="14" height="14" rx="3" fill="#fff" stroke="#cbd4e0"/><text x="502" y="197">incident.escalated</text>
+    <rect x="700" y="186" width="14" height="14" rx="3" fill="#fff" stroke="#cbd4e0"/><text x="722" y="197">remediation.decided</text>
+    <rect x="930" y="186" width="14" height="14" rx="3" fill="#fff" stroke="#cbd4e0"/><text x="952" y="197">slo.breached</text>
+  </g>
+  <rect x="40" y="222" width="170" height="38" rx="7" fill="#0b6e4f"/>
+  <text x="125" y="246" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">Register webhook</text>
+
+  <!-- registered list -->
+  <rect x="20" y="320" width="1160" height="280" rx="10" fill="#ffffff" stroke="#e2e7ee"/>
+  <rect x="20" y="320" width="1160" height="40" rx="10" fill="#fafbfc"/>
+  <rect x="20" y="346" width="1160" height="14" fill="#fafbfc"/>
+  <line x1="20" y1="360" x2="1180" y2="360" stroke="#e2e7ee"/>
+  <text x="36" y="345" fill="#43566a" font-size="13" font-weight="600">Registered webhooks</text>
+  <rect x="150" y="332" width="28" height="18" rx="9" fill="#eef2f7"/>
+  <text x="164" y="345" fill="#43566a" font-size="11" font-weight="700" text-anchor="middle">2</text>
+
+  <!-- row 1 -->
+  <text x="40" y="392" fill="#11202e" font-size="13.5" font-weight="600" font-family="'IBM Plex Mono', monospace">https://ops.example/incident-hook</text>
+  <text x="40" y="410" fill="#7387a0" font-size="11.5">incident.created, incident.state_changed · last: 200 @ 14:32 · 0 failures</text>
+  <rect x="1060" y="378" width="100" height="32" rx="7" fill="#fff" stroke="#d23"/>
+  <text x="1110" y="399" fill="#d23" font-size="12.5" font-weight="600" text-anchor="middle">Delete</text>
+  <line x1="40" y1="428" x2="1160" y2="428" stroke="#e2e7ee"/>
+  <!-- row 2 -->
+  <text x="40" y="456" fill="#11202e" font-size="13.5" font-weight="600" font-family="'IBM Plex Mono', monospace">https://pagerduty.example/v1/hook</text>
+  <text x="40" y="474" fill="#7387a0" font-size="11.5">all events · last: 500 @ 14:30 · 2 failures</text>
+  <rect x="1060" y="442" width="100" height="32" rx="7" fill="#fff" stroke="#d23"/>
+  <text x="1110" y="463" fill="#d23" font-size="12.5" font-weight="600" text-anchor="middle">Delete</text>
+  <line x1="40" y1="492" x2="1160" y2="492" stroke="#e2e7ee"/>
+
+  <!-- toast -->
+  <rect x="980" y="530" width="190" height="44" rx="8" fill="#2f8f5b"/>
+  <text x="1000" y="557" fill="#fff" font-size="13" font-weight="500">Webhook registered</text>
+
+  <text x="20" y="630" fill="#43566a" font-size="12.5" font-weight="600">Observability endpoints (live):</text>
+  <text x="20" y="652" fill="#7387a0" font-size="12" font-family="'IBM Plex Mono', monospace">GET /api/v1/metrics  → Prometheus exposition (request totals, durations, incidents, webhook deliveries)</text>
+  <text x="20" y="670" fill="#7387a0" font-size="12" font-family="'IBM Plex Mono', monospace">GET /api/v1/ready    → {"status":"ready","checks":{"observability_client":"mock","agent":"mock","persistence":"memory"}}</text>
+  <text x="20" y="688" fill="#7387a0" font-size="12" font-family="'IBM Plex Mono', monospace">Every response carries X-Request-ID for tracing.</text>
+  <text x="20" y="712" fill="#7387a0" font-size="12" font-style="italic">Figure 5 — Phase 3: webhook subscriptions, event-driven delivery status, toasts, live feed indicator, and service self-observability.</text>
+</svg>

@@ -125,3 +125,57 @@ export const apiExt = {
       body: JSON.stringify({ key }),
     }),
 };
+
+// --- Phase 3 API ---
+import type {
+  Postmortem,
+  ReadyState,
+  SLOTrend,
+  WebhookSubscription,
+} from '../types';
+
+export const apiP3 = {
+  getReady: () => http<ReadyState>('/ready'),
+  getMetricsText: () =>
+    fetch('/api/v1/metrics').then((r) => r.text()),
+  getSLOTrends: () =>
+    http<{ trends: SLOTrend[] }>('/slo/trends').then((r) => r.trends),
+  getPostmortem: (incidentId: string) =>
+    http<{ postmortem: Postmortem }>(
+      `/incidents/${incidentId}/postmortem`,
+    ).then((r) => r.postmortem),
+  searchIncidents: (params: {
+    state?: string;
+    severity?: string;
+    text?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params.state) q.set('state', params.state);
+    if (params.severity) q.set('severity', params.severity);
+    if (params.text) q.set('text', params.text);
+    q.set('offset', String(params.offset ?? 0));
+    q.set('limit', String(params.limit ?? 50));
+    return http<{ incidents: import('../types').Incident[]; page: import('../types').Page }>(
+      `/incidents-search?${q.toString()}`,
+    );
+  },
+  bulkTransition: (ids: string[], target: string, actor: string) =>
+    http<{ succeeded: string[]; failed: Record<string, string> }>(
+      '/incidents-bulk/transition',
+      {
+        method: 'POST',
+        body: JSON.stringify({ incident_ids: ids, target, actor }),
+      },
+    ),
+  listWebhooks: () =>
+    http<{ webhooks: WebhookSubscription[] }>('/webhooks').then((r) => r.webhooks),
+  createWebhook: (url: string, eventTypes: string[], description: string) =>
+    http<{ webhook: WebhookSubscription }>('/webhooks', {
+      method: 'POST',
+      body: JSON.stringify({ url, event_types: eventTypes, description }),
+    }).then((r) => r.webhook),
+  deleteWebhook: (id: string) =>
+    fetch(`/api/v1/webhooks/${id}`, { method: 'DELETE' }).then((r) => r.ok),
+};

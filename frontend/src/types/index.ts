@@ -190,3 +190,48 @@ export interface ScenarioInfo {
   match: string;
   severity: Severity;
 }
+
+// --- Phase 3 types ---
+export interface WebhookSubscription {
+  id: string;
+  url: string;
+  event_types: string[];
+  active: boolean;
+  description: string;
+  created_at: string;
+  last_status: number | null;
+  last_delivery_at: string | null;
+  failure_count: number;
+}
+
+export interface SLOTrend {
+  slo_id: string;
+  slo_name: string;
+  samples: number;
+  latest_state: BurnState;
+  latest_burn_rate: number;
+  min_burn_rate: number;
+  max_burn_rate: number;
+  avg_burn_rate: number;
+  direction: 'improving' | 'worsening' | 'stable';
+  series: { burn_rate: number; state: string; at: string }[];
+}
+
+export interface Postmortem {
+  incident_id: string;
+  title: string;
+  severity: Severity;
+  final_state: string;
+  summary: string;
+  tta_minutes: number | null;
+  ttr_minutes: number | null;
+  escalation_tier: string;
+  remediation_ids: string[];
+  timeline: { at: string; actor: string; event: string; detail: string }[];
+  markdown: string;
+}
+
+export interface ReadyState {
+  status: string;
+  checks: Record<string, string>;
+}

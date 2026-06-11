@@ -214,3 +214,83 @@ All depth sprints S11–S18 delivered and verified. Backend: 135 tests, 100%
 coverage. Frontend: 45-module build clean. SLO burn-rate model corrected and
 validated. E2E specs authored (browser binary download blocked in this sandbox;
 run on Desktop/CI). Persistence verified on both in-memory and SQLite backends.
+
+---
+
+## Phase 3 — Production Hardening (S19–S26)
+
+Goal: close the remaining production gaps — service self-observability, RBAC,
+an event bus + webhooks, standardised error/response envelopes, rate limiting,
+request tracing with correlation IDs, SLO history/trends, postmortems, incident
+search/bulk ops, and a frontend brought up to match (global store, live
+WebSocket updates, error boundaries, toasts). Strictly modular.
+
+| Phase | Name | Sprint | Status |
+|---|---|---|---|
+| P19 | Cross-cutting: error envelope, correlation IDs, request tracing middleware | S19 | 🟢 |
+| P20 | Service self-observability: Prometheus metrics + health/readiness | S20 | 🟢 |
+| P21 | RBAC: roles, permissions, scoped auth | S21 | 🟢 |
+| P22 | Event bus + webhook subscriptions for lifecycle events | S22 | 🟢 |
+| P23 | Rate limiting + standard response envelopes | S23 | 🟢 |
+| P24 | SLO history/trends + postmortem generation + incident search/bulk | S24 | 🟢 |
+| P25 | Frontend: global store, live WS updates, error boundaries, toasts, new views | S25 | 🟢 |
+| P26 | Tests to 100% + E2E + docs + repackage | S26 | 🟢 |
+
+### S19 — Cross-cutting middleware ⚪
+- [ ] Standard error envelope + exception handlers
+- [ ] Correlation-ID middleware (X-Request-ID propagation)
+- [ ] Request/timing logging middleware
+**Acceptance:** every response carries a request id; errors are uniform; tested.
+
+### S20 — Service self-observability ⚪
+- [ ] In-process metrics registry (counters/histograms), Prometheus exposition
+- [ ] Request metrics middleware; /metrics endpoint
+- [ ] Split /health (liveness) and /ready (readiness incl. dependencies)
+**Acceptance:** /metrics renders Prometheus text; /ready reflects dependency state.
+
+### S21 — RBAC ⚪
+- [ ] Role/Permission model; principal with roles
+- [ ] Permission dependency; route-level guards
+- [ ] API-key→role and JWT-claims→role mapping
+**Acceptance:** forbidden actions 403; permitted 200; tested across roles.
+
+### S22 — Event bus + webhooks ⚪
+- [ ] In-process async event bus; domain events emitted on lifecycle changes
+- [ ] Webhook subscription model + repository + delivery service
+- [ ] Endpoints to register/list/delete webhooks
+**Acceptance:** lifecycle change emits event → webhook delivery attempted; tested.
+
+### S23 — Rate limiting + envelopes ⚪
+- [ ] Token-bucket rate limiter middleware (per-principal/IP)
+- [ ] Standard success envelope option; consistent pagination metadata
+**Acceptance:** over-limit → 429 with Retry-After; tested.
+
+### S24 — SLO history + postmortem + search ⚪
+- [ ] SLO snapshot history repository + trend endpoint
+- [ ] Postmortem generator (timeline → structured doc) + endpoint
+- [ ] Incident search/filter (state, severity, text) + bulk transition
+**Acceptance:** trends return series; postmortem renders; search filters; tested.
+
+### S25 — Frontend expansion ⚪
+- [ ] Global store (context+reducer); typed API hooks
+- [ ] Live WebSocket problem feed wired into UI
+- [ ] Error boundary + toast notifications
+- [ ] Webhooks admin view; postmortem view; SLO trend sparkline
+**Acceptance:** builds clean; live updates; modular files (no monolith).
+
+### S26 — Tests + docs + package ⚪
+- [ ] Backend 100% coverage across new modules
+- [ ] E2E specs for new flows; docs + screenshots; repackage
+**Acceptance:** pytest 100%; docs current; zip delivered.
+| 2026-06-01 16:12 | S19–S24 | Backend production hardening: error envelope + correlation IDs + timing middleware; Prometheus /metrics + /health + /ready; RBAC (roles/permissions, guarded routes); async event bus + webhook subscriptions/delivery; token-bucket rate limiter; SLO trends + postmortem generator + incident search/bulk. All smoke-verified; 135 existing tests still green. |
+| 2026-06-01 16:28 | S25 | Frontend Phase 3: global store (context+reducer), toast store, error boundary, live WebSocket feed hook + indicator, Webhooks admin page, postmortem viewer, SLO trend sparklines. Build clean (51 modules); full stack verified over HTTP. |
+| 2026-06-01 16:28 | S26 | Phase 3 closeout: backend to 187 tests @ 100% coverage (middleware, metrics, RBAC, events, webhooks, rate-limit, SLO history, postmortem, new routes). Phase-3 E2E spec authored. Architecture + user guide + env + screenshot updated. Repackaged. |
+
+### Phase 3 — COMPLETE
+Production hardening S19–S26 delivered. Backend: 187 tests, 100% coverage.
+Frontend: 51-module build clean. Added: standard error envelope + correlation
+IDs, Prometheus metrics + health/readiness, RBAC, event bus + webhooks, rate
+limiting, SLO trends + postmortems + incident search/bulk, and a frontend with
+global store, live WebSocket feed, error boundary, toasts, and new views.
+E2E specs authored (browser binary download blocked in this sandbox; run on
+Desktop/CI). Persistence verified on memory + SQLite.

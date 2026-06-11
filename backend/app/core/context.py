@@ -36,10 +36,32 @@ class AppContext:
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )
+        # Event bus + webhook dispatcher.
+        import httpx
+
+        from app.events.bus import EventBus
+        from app.services.webhook_service import (
+            WebhookDispatcher,
+            WebhookRepository,
+        )
+
+        self.events = EventBus()
+        self.webhooks = WebhookRepository()
+        self._webhook_http = httpx.AsyncClient()
+        self.webhook_dispatcher = WebhookDispatcher(
+            self.webhooks, self._webhook_http,
+            timeout=self.settings.webhook_timeout_seconds,
+        )
+        self.webhook_dispatcher.register(self.events)
+
         self.incidents = IncidentService(
-            self.repos.incidents, self.escalation, self.notifications
+            self.repos.incidents, self.escalation, self.notifications,
+            events=self.events,
         )
         self.slo_engine = SLOEngine(self._collect_slos())
+        from app.services.slo_history import SLOHistory
+
+        self.slo_history = SLOHistory()
         self.current_scenario = self._initial_scenario()
 
     def _initial_scenario(self) -> str:
@@ -69,6 +91,7 @@ class AppContext:
         budgets = self.slo_engine.evaluate(measurements)
         for b in budgets:
             await self.repos.slo.save_budget(b)
+        self.slo_history.record(budgets)
         return budgets
 
     async def analytics(self) -> AnalyticsSummary:
@@ -84,3 +107,4 @@ class AppContext:
     async def shutdown(self) -> None:
         await self.client.close()
         await self.repos.dispose()
+        await self._webhook_http.aclose()

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from app.api.auth import require_auth
+from app.api.auth import require_permission
+from app.rbac.policy import Permission
 from app.api.schemas_ext import (
     AnalyticsResponse,
     NotificationListResponse,
@@ -24,7 +25,7 @@ def _ctx(request: Request) -> AppContext:
 
 @router.get("/slo", response_model=SLOListResponse, tags=["slo"])
 async def list_slo_budgets(
-    request: Request, _auth: dict = Depends(require_auth)
+    request: Request, _p=Depends(require_permission(Permission.SLO_READ))
 ) -> SLOListResponse:
     ctx = _ctx(request)
     budgets = await ctx.evaluate_slos()
@@ -33,7 +34,7 @@ async def list_slo_budgets(
 
 @router.get("/analytics", response_model=AnalyticsResponse, tags=["analytics"])
 async def get_analytics(
-    request: Request, _auth: dict = Depends(require_auth)
+    request: Request, _p=Depends(require_permission(Permission.ANALYTICS_READ))
 ) -> AnalyticsResponse:
     ctx = _ctx(request)
     return AnalyticsResponse(summary=await ctx.analytics())
@@ -47,7 +48,7 @@ async def get_analytics(
 async def list_notifications(
     request: Request,
     incident_id: str | None = None,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> NotificationListResponse:
     ctx = _ctx(request)
     notifications = await ctx.notifications.list_all() if incident_id is None \
@@ -57,7 +58,7 @@ async def list_notifications(
 
 @router.get("/scenarios", response_model=ScenarioListResponse, tags=["scenarios"])
 async def list_scenarios(
-    request: Request, _auth: dict = Depends(require_auth)
+    request: Request, _p=Depends(require_permission(Permission.INCIDENT_READ))
 ) -> ScenarioListResponse:
     ctx = _ctx(request)
     infos = [
@@ -79,7 +80,7 @@ async def list_scenarios(
 async def select_scenario(
     request: Request,
     body: SelectScenarioRequest,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.SCENARIO_WRITE)),
 ) -> ScenarioListResponse:
     ctx = _ctx(request)
     ctx.set_scenario(body.key)

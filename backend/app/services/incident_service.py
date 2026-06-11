@@ -45,10 +45,21 @@ class IncidentService:
         repo: IncidentRepository,
         escalation: EscalationEngine,
         notifications: NotificationService,
+        events=None,
     ) -> None:
         self._repo = repo
         self._escalation = escalation
         self._notifications = notifications
+        self._events = events
+
+    async def _emit(self, event_type, subject_id: str, **payload) -> None:
+        if self._events is None:
+            return
+        from app.events.bus import DomainEvent
+
+        await self._events.publish(
+            DomainEvent(type=event_type, subject_id=subject_id, payload=payload)
+        )
 
     # --- creation ----------------------------------------------------------
     async def create_from_problem(
@@ -71,6 +82,14 @@ class IncidentService:
             )
         )
         await self._repo.add(incident)
+        from app.events.bus import EventType
+        from app.observability.metrics import get_metrics
+
+        get_metrics().incidents_created.inc(severity=problem.severity.value)
+        await self._emit(
+            EventType.INCIDENT_CREATED, incident.id,
+            title=incident.title, severity=incident.severity.value,
+        )
         return incident
 
     async def get(self, incident_id: str) -> Incident | None:
@@ -114,6 +133,12 @@ class IncidentService:
             )
         )
         await self._repo.update(incident)
+        from app.events.bus import EventType
+
+        await self._emit(
+            EventType.INCIDENT_STATE_CHANGED, incident.id,
+            **{"from": prev.value, "to": target.value},
+        )
         return incident
 
     async def assign(
@@ -201,3 +226,47 @@ class IncidentService:
         if incident is None:
             raise IncidentError(f"Incident {incident_id} not found")
         return incident
+
+    # --- search & bulk -----------------------------------------------------
+    async def search(
+        self,
+        *,
+        state=None,
+        severity=None,
+        text: str | None = None,
+        venue_id: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ):
+        """Filter incidents by state, severity, free text and venue."""
+        all_incidents = await self._repo.list(
+            venue_id=venue_id, offset=0, limit=10_000
+        )
+        results = []
+        needle = (text or "").lower()
+        for inc in all_incidents:
+            if state is not None and inc.state != state:
+                continue
+            if severity is not None and inc.severity != severity:
+                continue
+            if needle and needle not in (
+                inc.title.lower() + " " + inc.impact_summary.lower()
+            ):
+                continue
+            results.append(inc)
+        total = len(results)
+        return results[offset : offset + limit], total
+
+    async def bulk_transition(
+        self, incident_ids: list[str], target, *, actor: str = "system"
+    ) -> dict:
+        """Transition many incidents; report per-id success/failure."""
+        succeeded: list[str] = []
+        failed: dict[str, str] = {}
+        for iid in incident_ids:
+            try:
+                await self.transition(iid, target, actor=actor)
+                succeeded.append(iid)
+            except IncidentError as exc:
+                failed[iid] = str(exc)
+        return {"succeeded": succeeded, "failed": failed}

@@ -161,3 +161,55 @@ components (`SLODashboard`, `AnalyticsPanel`, `ScenarioSwitcher`,
 ### Testing
 **135 tests, 100% backend statement coverage**, including a parametrised
 repository contract suite run against both persistence backends.
+
+---
+
+## Phase 3 — Production Hardening
+
+### Cross-cutting (`app/middleware/`, `app/core/errors.py`)
+- **Standard error envelope** — every error response is
+  `{"error":{"code","message","request_id","details"}}` via centralised
+  exception handlers (`AppError` subclasses, HTTPException, validation, and a
+  catch-all).
+- **Correlation IDs** — `CorrelationIdMiddleware` assigns/propagates an
+  `X-Request-ID` (stored in a context var, echoed on the response, attached to
+  logs and error envelopes).
+- **Request metrics + timing log** — `RequestMetricsMiddleware`.
+
+### Self-observability (`app/observability/`, `app/api/routes_observability.py`)
+- Dependency-free Prometheus metrics registry (counters + histograms):
+  request totals/durations, incidents created, remediation decisions, events
+  published, webhook deliveries.
+- `GET /api/v1/metrics` (Prometheus text), `GET /api/v1/health` (liveness),
+  `GET /api/v1/ready` (readiness with per-dependency state).
+
+### RBAC (`app/rbac/`, `app/api/auth.py`)
+- Roles (viewer / operator / responder / admin) → fine-grained permissions.
+- `require_permission(Permission.X)` dependency guards routes; API-key→roles and
+  JWT-claims→roles mapping. Auth-disabled requests act as a full-access admin.
+
+### Event bus + webhooks (`app/events/`, `app/services/webhook_service.py`)
+- Async in-process event bus; domain events emitted on incident lifecycle
+  changes. Webhook subscriptions + an event-driven delivery dispatcher (records
+  status/failures, never raises). `POST/GET/DELETE /api/v1/webhooks`.
+
+### Rate limiting (`app/middleware/ratelimit.py`)
+- Per-principal/IP token bucket → 429 + `Retry-After`. Monitoring endpoints
+  exempt. Enabled via `RATE_LIMIT_ENABLED`.
+
+### Analysis (`app/services/slo_history.py`, `postmortem.py`; `routes_analysis.py`)
+- SLO snapshot history + burn-rate trends (`GET /api/v1/slo/trends`).
+- Postmortem generator (timeline → structured doc + markdown)
+  (`GET /api/v1/incidents/{id}/postmortem`).
+- Incident search/filter (`GET /api/v1/incidents-search`) and bulk transition
+  (`POST /api/v1/incidents-bulk/transition`).
+
+### Frontend (`src/store/`, `src/hooks/`, new pages/components)
+- Global store (context + reducer), toast store, error boundary.
+- Live WebSocket feed hook + topbar indicator.
+- Webhooks admin page, postmortem viewer, SLO trend sparklines, new Webhooks tab.
+
+### Testing
+**187 tests, 100% backend statement coverage**, including middleware, metrics,
+RBAC, event bus, webhooks, rate limiting, SLO history, postmortems, and the new
+routes.

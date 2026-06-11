@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from app.api.auth import require_auth
+from app.api.auth import require_permission
+from app.rbac.policy import Permission
 from app.api.schemas_ext import (
     AssignRequest,
     CreateIncidentRequest,
@@ -30,7 +31,7 @@ async def list_incidents(
     venue_id: str | None = None,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> IncidentListResponse:
     ctx = _ctx(request)
     incidents = await ctx.incidents.list(
@@ -46,7 +47,7 @@ async def list_incidents(
 async def create_incident(
     request: Request,
     body: CreateIncidentRequest,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
     problem = await ctx.client.get_problem(body.problem_id)
@@ -60,7 +61,8 @@ async def create_incident(
 
 @router.get("/{incident_id}", response_model=IncidentResponse)
 async def get_incident(
-    request: Request, incident_id: str, _auth: dict = Depends(require_auth)
+    request: Request, incident_id: str,
+    _p=Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
     incident = await ctx.incidents.get(incident_id)
@@ -74,7 +76,7 @@ async def transition_incident(
     request: Request,
     incident_id: str,
     body: TransitionRequest,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
     try:
@@ -94,7 +96,7 @@ async def assign_incident(
     request: Request,
     incident_id: str,
     body: AssignRequest,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
     try:
@@ -111,7 +113,7 @@ async def add_note(
     request: Request,
     incident_id: str,
     body: NoteRequest,
-    _auth: dict = Depends(require_auth),
+    _p=Depends(require_permission(Permission.INCIDENT_WRITE)),
 ) -> IncidentResponse:
     ctx = _ctx(request)
     try:
@@ -125,7 +127,7 @@ async def add_note(
 
 @router.post("/{incident_id}/escalate", response_model=IncidentResponse)
 async def escalate_incident(
-    request: Request, incident_id: str, _auth: dict = Depends(require_auth)
+    request: Request, incident_id: str, _p=Depends(require_permission(Permission.INCIDENT_WRITE))
 ) -> IncidentResponse:
     ctx = _ctx(request)
     try:
