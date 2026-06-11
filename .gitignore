@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+node_modules/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.venv/
