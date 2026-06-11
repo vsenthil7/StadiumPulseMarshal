@@ -22,6 +22,8 @@ class AnalyticsSummary(BaseModel):
     by_venue: dict[str, int] = Field(default_factory=dict)
     slo_breaching: int = 0
     slo_total: int = 0
+    burn_page_alerts: int = 0
+    burn_ticket_alerts: int = 0
 
 
 def _mean(values: list[float]) -> float | None:

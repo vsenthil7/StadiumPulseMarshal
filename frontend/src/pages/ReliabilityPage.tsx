@@ -4,6 +4,7 @@ import type { AnalyticsSummary, ErrorBudget, SLOTrend } from '../types';
 import { SLODashboard } from '../components/SLODashboard';
 import { AnalyticsPanel } from '../components/AnalyticsPanel';
 import { VenueDashboard } from '../components/VenueDashboard';
+import { BurnAlertBanner } from '../components/BurnAlertBanner';
 import { SLOTrends } from '../components/SLOTrends';
 
 export function ReliabilityPage() {
@@ -38,6 +39,7 @@ export function ReliabilityPage() {
 
   return (
     <div data-testid="reliability-page">
+      <BurnAlertBanner />
       <div className="panel">
         <header>
           <h3>Error budgets (SLO)</h3>

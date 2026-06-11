@@ -115,6 +115,16 @@ export const apiExt = {
     http<{ summary: AnalyticsSummary }>('/analytics').then((r) => r.summary),
   getAnalyticsByVenue: () =>
     http<{ venues: VenueAnalytics[] }>('/analytics/by-venue').then((r) => r.venues),
+  getBurnAlerts: () =>
+    http<{
+      alerts: {
+        slo_id: string; slo_name: string; service_id: string;
+        venue_id: string | null; severity: string; burn_rate: number;
+        long_window_hours: number; short_window_hours: number;
+        error_budget_consumed_pct: number; message: string;
+      }[];
+      page_count: number; ticket_count: number;
+    }>('/slo/burn-alerts'),
   getNotifications: () =>
     http<{ notifications: NotificationItem[] }>('/notifications').then(
       (r) => r.notifications,

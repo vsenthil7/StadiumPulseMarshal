@@ -1,1 +1,2 @@
 redis>=5  # optional: enables shared cross-instance rate limiting (REDIS_URL)
+fakeredis>=2  # dev/test: real Redis-protocol server for multi-instance e2e

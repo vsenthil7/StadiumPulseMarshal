@@ -54,15 +54,4 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     ),
                 )
         response = await call_next(request)
-        # Issue/refresh the CSRF cookie on safe navigations so the SPA can read
-        # it for subsequent unsafe requests (double-submit).
-        if request.method in _SAFE_METHODS and _COOKIE not in request.cookies:
-            token = secrets.token_urlsafe(32)
-            response.set_cookie(
-                _COOKIE, token,
-                httponly=False,  # must be readable by JS to echo in the header
-                samesite="strict",
-                secure=self._secure,
-                path="/",
-            )
         return response

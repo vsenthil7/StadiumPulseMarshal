@@ -441,3 +441,40 @@ pagination and `fmt=csv` export; the Security page got server-side pagination
 ### Tests
 Backend **314 pass** (+10 this round). Frontend `tsc -b` + `vite build` green;
 7 node RBAC unit tests pass.
+
+---
+
+## Round 12 — Nonce CSP, default-on CSRF, burn-rate alerting, real Redis e2e
+
+### Nonce-based Content-Security-Policy
+The CSP is now per-request nonce-based: `SecurityHeadersMiddleware` generates a
+fresh nonce each request, the served SPA HTML has the nonce injected into its
+script/style tags, and `script-src` is `'self' 'nonce-…'` with **no
+`'unsafe-inline'` for scripts** — closing the inline-script XSS vector. Verified
+live: nonces differ per request.
+
+### CSRF wired and default-on-capable
+`GET /auth/csrf` issues a double-submit token cookie; the SPA's HTTP client reads
+it and echoes `X-CSRF-Token` on every state-changing request. The CSRF guard is
+bearer-exempt (token auth can't be CSRF'd), so enabling it does not break the
+SPA's normal Bearer flows — it's safe to turn on for cookie-auth deployments.
+
+### Multi-window SLO burn-rate alerting
+A burn-rate engine implements the Google SRE multi-window/multi-burn-rate tiers:
+fast (14.4× over 1h/5m → **page**), medium (6× over 6h/30m → page), slow (3× over
+24h/2h → **ticket**), trickle (1× → ticket). A tier fires only when both its
+windows exceed the factor (anti-flap). `GET /slo/burn-alerts` is venue-scoped,
+counts are surfaced in `/analytics`, and the Reliability page shows a burn-alert
+banner. Verified live: the degraded Payments SLO raises a 1.5× ticket alert.
+
+### Real Redis end-to-end
+The shared-state design is now validated against a real Redis protocol
+(`fakeredis`, including `redis.asyncio`): two app instances sharing one Redis
+enforce a single global auth rate limit — proven through a full HTTP round-robin
+path across two ASGI app instances, not just at the limiter level. The
+`docker-compose.yml` (Redis + 2 replicas + nginx) remains for a Docker host;
+`scripts/verify_multi_instance.sh` exercises it there.
+
+### Tests
+Backend **328 pass** (+14 this round). Frontend `tsc -b` + `vite build` green;
+7 node RBAC unit tests pass.

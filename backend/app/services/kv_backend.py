@@ -71,10 +71,13 @@ class MemoryKV:
 class RedisKV:
     """Redis-backed KV shared across instances. redis-py imported lazily."""
 
-    def __init__(self, url: str) -> None:
-        import redis.asyncio as aioredis  # lazy import; optional dependency
+    def __init__(self, url: str, client=None) -> None:
+        if client is not None:
+            self._r = client
+        else:
+            import redis.asyncio as aioredis  # lazy import; optional dependency
 
-        self._r = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
+            self._r = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
 
     async def incr(self, key: str, ttl_seconds: int) -> int:
         # Pipeline INCR + (conditional) EXPIRE so the window self-clears.

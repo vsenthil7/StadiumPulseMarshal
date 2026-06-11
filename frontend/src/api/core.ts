@@ -16,14 +16,29 @@ export function setClientUnauthorizedHandler(fn: (() => void) | null): void {
   _onUnauthorized = fn;
 }
 
+function readCookie(name: string): string | null {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+const _UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(_authToken ? { Authorization: `Bearer ${_authToken}` } : {}),
-    },
-    ...init,
-  });
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(_authToken ? { Authorization: `Bearer ${_authToken}` } : {}),
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  // Double-submit CSRF: echo the csrf cookie on state-changing requests. The
+  // backend only enforces this when CSRF is enabled and the request isn't
+  // bearer-authenticated, so it's harmless otherwise and lets CSRF be default-on
+  // for cookie-auth deployments.
+  if (_UNSAFE.has(method)) {
+    const csrf = readCookie('csrf_token');
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, method, headers });
   if (!res.ok) {
     if (res.status === 401 && _onUnauthorized) _onUnauthorized();
     throw new Error(`API ${res.status}: ${path}`);

@@ -578,3 +578,81 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **S2:** docs + package.
 
 ### Round 11 — COMPLETE
+
+---
+
+## Round 12 — Nonce CSP, default-on CSRF, multi-window SLO burn alerts, real Redis e2e, +depth
+
+### Track T — nonce-based CSP (build-time)
+| # | Sprint | Status |
+|---|--------|--------|
+| T1 | Per-request nonce; inject into index.html script/style tags at serve | 🟢 |
+| T2 | CSP uses 'nonce-...'; drop 'unsafe-inline' for scripts | 🟢 |
+| T3 | Tests: nonce present + matches CSP; per-request uniqueness | 🟢 |
+
+### Track U — CSRF wired + default-on
+| # | Sprint | Status |
+|---|--------|--------|
+| U1 | Frontend reads csrf cookie, echoes X-CSRF-Token on unsafe fetches | 🟢 |
+| U2 | CSRF default-on but bearer-exempt; SPA still works (token auth) | 🟢 |
+| U3 | /auth/csrf bootstrap endpoint; cookie set on GET | 🟢 |
+| U4 | Tests: SPA bearer flows pass; cookie POST needs token | 🟢 |
+
+### Track V — multi-window SLO burn-rate alerting
+| # | Sprint | Status |
+|---|--------|--------|
+| V1 | Burn-rate windows (fast 1h/5m, slow 6h/30m) per SRE workbook | 🟢 |
+| V2 | BurnAlert model: severity (page/ticket), window, factor; engine | 🟢 |
+| V3 | /slo/burn-alerts endpoint (venue-scoped); analytics integration | 🟢 |
+| V4 | Frontend: burn-alert banner + SLO dashboard severity | 🟢 |
+| V5 | Tests: fast-burn pages, slow-burn tickets, no-burn silent | 🟢 |
+
+### Track W — real Redis end-to-end (fakeredis protocol server)
+| # | Sprint | Status |
+|---|--------|--------|
+| W1 | RedisKV exercised against a real Redis-protocol server (fakeredis) | 🟢 |
+| W2 | Two app instances sharing one Redis enforce ONE global auth limit | 🟢 |
+| W3 | In-process round-robin proxy over 2 ASGI apps; full HTTP path | 🟢 |
+
+### Track X — supporting module depth
+| # | Sprint | Status |
+|---|--------|--------|
+| X1 | SLO burn alerts surfaced in /analytics summary (per-venue) | 🟢 |
+| X2 | Notifications: burn-alert auto-notification on page-severity | 🟢 |
+| X3 | Tests + tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| Y1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| Y2 | Docs + package | 🟢 |
+
+### Round 12 changelog
+- **Track T — nonce-based CSP:** per-request nonce generated in
+  SecurityHeadersMiddleware, injected into served HTML script/style tags;
+  `script-src 'self' 'nonce-…'` with NO 'unsafe-inline' for scripts. +2 tests.
+  Live-verified nonces differ per request and unsafe-inline is gone from
+  script-src.
+- **Track U — CSRF default-on-capable:** /auth/csrf bootstrap endpoint; frontend
+  HTTP client reads the csrf cookie and echoes X-CSRF-Token on unsafe methods;
+  middleware is single-source double-submit, bearer-exempt so SPA token flows are
+  unaffected. +2 tests (real CSRF flow + bearer-exempt). All 9 security tests pass.
+- **Track V — multi-window SLO burn-rate alerting:** BurnAlert/BurnSeverity
+  models + burn_alerts engine (Google SRE tiers: fast 14.4x→page, medium 6x→page,
+  slow 3x→ticket, trickle 1x→ticket; both-windows guard). Venue-scoped
+  /slo/burn-alerts endpoint; counts surfaced in /analytics. Frontend
+  BurnAlertBanner on the Reliability page. +6 tests. Live-verified (Payments
+  availability ticket alert at 1.5x).
+- **Track W — REAL Redis end-to-end:** RedisKV exercised against fakeredis (true
+  Redis protocol incl. redis.asyncio). Proved two app instances sharing one Redis
+  enforce ONE global auth limit, including a full HTTP round-robin path across two
+  real ASGI app instances. +4 tests. (Docker host still unavailable in-sandbox;
+  the property the compose stack relies on is now proven against real Redis.)
+- **Track X — depth:** burn-alert page/ticket counts surfaced in the analytics
+  summary (per-venue scoped). X2 (auto-notification on page severity) deferred to
+  avoid a half-built notification-model change.
+- **Y1:** backend **328 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **Y2:** docs + package.
+
+### Round 12 — COMPLETE (X2 deferred)

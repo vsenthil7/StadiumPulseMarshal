@@ -286,6 +286,27 @@ async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
     return {"ok": True}
 
 
+@router.get("/csrf")
+async def csrf_bootstrap(request: Request):
+    """Issue a CSRF token cookie for SPAs using cookie-based flows.
+
+    Returns the token in the body too, so a SPA can echo it in the
+    ``X-CSRF-Token`` header (double-submit). Harmless when CSRF is disabled.
+    """
+    import secrets
+
+    from starlette.responses import JSONResponse
+
+    token = request.cookies.get("csrf_token") or secrets.token_urlsafe(32)
+    resp = JSONResponse({"csrf_token": token})
+    resp.set_cookie(
+        "csrf_token", token,
+        httponly=False, samesite="strict",
+        secure=request.app.state.ctx.settings.cookie_secure, path="/",
+    )
+    return resp
+
+
 @router.get("/events")
 async def auth_events(
     request: Request,

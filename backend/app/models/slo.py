@@ -124,3 +124,39 @@ class ErrorBudget(BaseModel):
     @property
     def is_breaching(self) -> bool:
         return self.achieved < self.target
+
+
+class BurnSeverity(str, Enum):
+    """Burn-rate alert severity, mapped to a response channel."""
+
+    PAGE = "page"      # fast burn — wake someone now
+    TICKET = "ticket"  # slow burn — file for the next working day
+    NONE = "none"
+
+
+class BurnAlert(BaseModel):
+    """A multi-window burn-rate alert for one SLO.
+
+    Fires only when BOTH the long and short windows exceed the tier's burn-rate
+    factor (the standard Google SRE multi-window/multi-burn-rate guard against
+    flapping). ``budget_consumed_pct_per_hour`` is a human-friendly read-out.
+    """
+
+    slo_id: str
+    slo_name: str
+    service_id: str
+    venue_id: str | None = None
+    severity: BurnSeverity
+    burn_rate: float
+    long_window_hours: float
+    short_window_hours: float
+    factor: float
+    error_budget_consumed_pct: float
+    message: str = ""
+    at: datetime = Field(default_factory=_utcnow)
+
+
+class BurnAlertList(BaseModel):
+    alerts: list[BurnAlert] = Field(default_factory=list)
+    page_count: int = 0
+    ticket_count: int = 0

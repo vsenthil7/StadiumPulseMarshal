@@ -668,3 +668,16 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .pager-info { font-size: 12px; color: var(--ink-2); }
 .seg:disabled { opacity: .4; cursor: default; }
 .export-btn { margin-left: auto; }
+
+/* ---------- Burn-rate alert banner ---------- */
+.burn-banner { border: 1px solid rgba(214,128,32,.4); background: rgba(214,128,32,.06);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; }
+.burn-banner-head { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; }
+.burn-banner-title { font-weight: 700; color: var(--ink); }
+.burn-banner-counts { display: flex; gap: 6px; }
+.burn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.burn-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.burn-item.burn-page { font-weight: 600; }
+.burn-msg { flex: 1; color: var(--ink); }
+.burn-pct { color: var(--ink-2); font-variant-numeric: tabular-nums; }

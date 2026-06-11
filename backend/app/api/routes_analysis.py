@@ -10,6 +10,7 @@ from app.core.context import AppContext
 from app.core.errors import NotFoundError
 from app.models.enums import Severity
 from app.models.incident import IncidentState
+from app.models.slo import BurnAlertList
 from app.rbac.policy import Permission, Principal
 from app.services.postmortem import Postmortem, generate_postmortem
 from app.services.slo_history import SLOTrend
@@ -38,6 +39,23 @@ class BulkTransitionRequest(BaseModel):
 class BulkTransitionResponse(BaseModel):
     succeeded: list[str] = Field(default_factory=list)
     failed: dict[str, str] = Field(default_factory=dict)
+
+
+@router.get("/slo/burn-alerts", response_model=BurnAlertList, tags=["slo"])
+async def slo_burn_alerts(
+    request: Request,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> BurnAlertList:
+    """Multi-window burn-rate alerts, scoped to the principal's venues."""
+    ctx = _ctx(request)
+    alerts = await ctx.burn_alerts(
+        principal_venues=None if principal.all_venues else principal.venues,
+    )
+    return BurnAlertList(
+        alerts=alerts,
+        page_count=sum(1 for a in alerts if a.severity.value == "page"),
+        ticket_count=sum(1 for a in alerts if a.severity.value == "ticket"),
+    )
 
 
 @router.get("/slo/trends", response_model=SLOTrendResponse, tags=["slo"])

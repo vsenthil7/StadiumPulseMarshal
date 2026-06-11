@@ -13,16 +13,19 @@ non-TLS environments.
 """
 from __future__ import annotations
 
+import secrets
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-# Conservative default CSP for a same-origin SPA. 'unsafe-inline' is permitted
-# for styles only (Vite injects a small style block); scripts are same-origin.
-_DEFAULT_CSP = (
+# Conservative default CSP for a same-origin SPA. Scripts are same-origin and
+# may also carry a per-request nonce (for any injected inline script); styles
+# allow a nonce too. No 'unsafe-inline' for scripts.
+_DEFAULT_CSP_TEMPLATE = (
     "default-src 'self'; "
-    "script-src 'self'; "
-    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'nonce-{nonce}'; "
+    "style-src 'self' 'nonce-{nonce}' 'unsafe-inline'; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
     "font-src 'self' data:; "
@@ -35,13 +38,18 @@ _DEFAULT_CSP = (
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, *, csp: str | None = None, hsts: bool = False) -> None:
         super().__init__(app)
-        self._csp = csp or _DEFAULT_CSP
+        self._csp_override = csp
         self._hsts = hsts
 
     async def dispatch(self, request: Request, call_next) -> Response:
+        # Per-request nonce so injected inline tags can be whitelisted by CSP
+        # without 'unsafe-inline' for scripts. Exposed via request.state.
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
         response = await call_next(request)
         h = response.headers
-        h.setdefault("Content-Security-Policy", self._csp)
+        csp = self._csp_override or _DEFAULT_CSP_TEMPLATE.format(nonce=nonce)
+        h.setdefault("Content-Security-Policy", csp)
         h.setdefault("X-Frame-Options", "DENY")
         h.setdefault("X-Content-Type-Options", "nosniff")
         h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")

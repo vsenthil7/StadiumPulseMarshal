@@ -176,7 +176,55 @@ class AppContext:
             def _bv(b):
                 return self.entity_venue.venue_for(slo_entity.get(b.slo_id))
             budgets = [b for b in budgets if _bv(b) is None or _bv(b) in allowed]
-        return compute_summary(incidents, budgets)
+        summary = compute_summary(incidents, budgets)
+        # Surface multi-window burn-rate alert counts (scoped).
+        try:
+            from app.services.burn_alerts import evaluate_burn_alerts
+
+            slo_entity = {s.id: s.service_id for s in self.slo_engine.slos}
+            venue_of = {
+                sid: self.entity_venue.venue_for(eid)
+                for sid, eid in slo_entity.items()
+            }
+            alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of)
+            if allowed is not None:
+                alerts = [a for a in alerts
+                          if a.venue_id is None or a.venue_id in allowed]
+            summary.burn_page_alerts = sum(
+                1 for a in alerts if a.severity.value == "page"
+            )
+            summary.burn_ticket_alerts = sum(
+                1 for a in alerts if a.severity.value == "ticket"
+            )
+        except Exception:  # noqa: BLE001 - analytics must not fail on alerting
+            pass
+        return summary
+
+    async def burn_alerts(
+        self, principal_venues: list[str] | None = None,
+    ) -> list:
+        """Evaluate multi-window burn-rate alerts, scoped to the principal's
+        venues (None = all). Maps each SLO to its owning venue for labels and
+        scope."""
+        from app.services.burn_alerts import evaluate_burn_alerts
+
+        await self.ensure_entity_venue_map()
+        budgets = await self.repos.slo.list_budgets()
+        if not budgets:
+            budgets = await self.evaluate_slos()
+        slo_entity = {s.id: s.service_id for s in self.slo_engine.slos}
+        venue_of = {
+            sid: self.entity_venue.venue_for(eid)
+            for sid, eid in slo_entity.items()
+        }
+        alerts = evaluate_burn_alerts(self.slo_engine.slos, budgets, venue_of)
+        if principal_venues is not None:
+            allowed = set(principal_venues)
+            alerts = [
+                a for a in alerts
+                if a.venue_id is None or a.venue_id in allowed
+            ]
+        return alerts
 
     async def analytics_by_venue(
         self, principal_venues: list[str] | None = None,
