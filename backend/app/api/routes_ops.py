@@ -66,6 +66,7 @@ async def get_analytics_by_venue(
 @router.get("/analytics", response_model=AnalyticsResponse, tags=["analytics"])
 async def get_analytics(
     request: Request, venue_id: str | None = None,
+    suppression_window_hours: float = 24.0,
     principal: Principal = Depends(require_permission(Permission.ANALYTICS_READ)),
 ) -> AnalyticsResponse:
     ctx = _ctx(request)
@@ -74,6 +75,7 @@ async def get_analytics(
     return AnalyticsResponse(summary=await ctx.analytics(
         principal_venues=None if principal.all_venues else principal.venues,
         venue_filter=venue_id,
+        suppression_window_hours=suppression_window_hours,
     ))
 
 

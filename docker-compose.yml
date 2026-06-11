@@ -22,6 +22,7 @@ services:
     environment:
       - USE_MOCKS=true
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite+aiosqlite:////data/spm.db
       - AUTH_RATE_LIMIT_PER_MINUTE=5
       - SECURITY_HEADERS_ENABLED=true
       - INSTANCE_ID=app1
@@ -29,6 +30,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    volumes:
+      - spm-data:/data
 
   app2:
     build:
@@ -36,6 +39,7 @@ services:
     environment:
       - USE_MOCKS=true
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite+aiosqlite:////data/spm.db
       - AUTH_RATE_LIMIT_PER_MINUTE=5
       - SECURITY_HEADERS_ENABLED=true
       - INSTANCE_ID=app2
@@ -43,6 +47,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    volumes:
+      - spm-data:/data
 
   lb:
     image: nginx:1.27-alpine
@@ -53,3 +59,9 @@ services:
     depends_on:
       - app1
       - app2
+
+# Named volume backing the SQLite ack/silence DB shared by both replicas.
+# Note: SQLite suits durability-across-restarts in this demo; for true
+# multi-writer concurrency use Postgres (set DATABASE_URL accordingly).
+volumes:
+  spm-data:

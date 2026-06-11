@@ -86,21 +86,82 @@ async def slo_burn_events(
     return {"events": page, "total": total, "offset": offset, "limit": limit}
 
 
+@router.get("/slo/burn-digest", tags=["slo"])
+async def slo_burn_digest(
+    request: Request,
+    _p: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Preview the burn/suppression digest message (as the scheduler would send)."""
+    from app.services.digest_service import compose_digest
+
+    ctx = _ctx(request)
+    return {"digest": await compose_digest(ctx)}
+
+
+@router.get("/slo/burn-by-venue", tags=["slo"])
+async def slo_burn_by_venue(
+    request: Request,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Per-venue burn breakdown: page/ticket alert counts + active acks/silences.
+
+    Scoped to the principal's venues. Lets the console compare burn pressure and
+    suppression across venues at a glance.
+    """
+    ctx = _ctx(request)
+    alerts = await ctx.burn_alerts(
+        principal_venues=None if principal.all_venues else principal.venues,
+    )
+    active = await ctx.burn_acks.active_summary()
+    venues: dict[str, dict] = {}
+
+    def _row(vid: str) -> dict:
+        return venues.setdefault(vid, {
+            "venue_id": vid, "page": 0, "ticket": 0,
+            "active_acks": 0, "active_silences": 0,
+        })
+
+    for a in alerts:
+        vid = a.venue_id or "unassigned"
+        row = _row(vid)
+        sev = a.severity.value if hasattr(a.severity, "value") else str(a.severity)
+        if sev in ("page", "ticket"):
+            row[sev] += 1
+    for a in active["acks"]:
+        vid = _scope_venue(ctx, a.get("slo_id", "")) or "unassigned"
+        _row(vid)["active_acks"] += 1
+    for s in active["silences"]:
+        vid = _scope_venue(ctx, s.get("slo_id", "")) or "unassigned"
+        _row(vid)["active_silences"] += 1
+
+    if not principal.all_venues:
+        allowed = set(principal.venues)
+        venues = {k: v for k, v in venues.items()
+                  if k in allowed or k == "unassigned"}
+    return {"venues": sorted(venues.values(), key=lambda r: r["venue_id"])}
+
+
+def _scope_venue(ctx, slo_id: str) -> str | None:
+    slo = next((x for x in ctx.slo_engine.slos if x.id == slo_id), None)
+    if slo is None:
+        return None
+    return ctx.entity_venue.venue_for(slo.service_id)
+
+
 @router.get("/slo/burn-trend", tags=["slo"])
 async def slo_burn_trend(
     request: Request, hours: float = 24.0, buckets: int = 12,
+    venue_id: str | None = None,
     _p: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> dict:
     """Bucketed ack/silence counts over a trailing window (for a trend chart).
 
-    Splits the window into ``buckets`` equal slices, newest last, each carrying
-    the ack/silence/unack/unsilence counts that fall in it — a small time series
-    the On-call page renders as bars.
+    Prefers pre-aggregated counter buckets; falls back to the audit trail when
+    counters are empty. Optional ``venue_id`` filter.
     """
     from datetime import datetime, timezone
 
     ctx = _ctx(request)
-    entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
     now = datetime.now(timezone.utc).timestamp()
     span = hours * 3600
     start = now - span
@@ -111,65 +172,99 @@ async def slo_burn_trend(
          "start_epoch": round(start + i * width, 1)}
         for i in range(buckets)
     ]
-    for e in entries:
-        ts = e.at.timestamp()
-        if ts < start or ts > now:
-            continue
-        idx = min(buckets - 1, int((ts - start) / width))
-        verb = e.action.replace("burn.", "")
-        if verb in ("ack", "silence", "unack", "unsilence"):
-            series[idx][verb] += 1
+
+    def _bucket_index(ts: float) -> int:
+        return min(buckets - 1, max(0, int((ts - start) / width)))
+
+    if await ctx.burn_counters.any_recorded():
+        from app.services.burn_counters import BUCKET_SECONDS
+
+        ctr = await ctx.burn_counters.buckets(
+            int(start // BUCKET_SECONDS) * BUCKET_SECONDS, venue_id)
+        for bucket_epoch, actions in ctr.items():
+            if bucket_epoch < start or bucket_epoch > now:
+                continue
+            idx = _bucket_index(bucket_epoch)
+            for verb, n in actions.items():
+                if verb in series[idx]:
+                    series[idx][verb] += n
+    else:
+        entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
+        for e in entries:
+            ts = e.at.timestamp()
+            if ts < start or ts > now:
+                continue
+            verb = e.action.replace("burn.", "")
+            if verb in ("ack", "silence", "unack", "unsilence"):
+                series[_bucket_index(ts)][verb] += 1
+
     return {"window_hours": hours, "bucket_width_seconds": round(width, 1),
-            "buckets": series}
+            "venue_id": venue_id, "buckets": series}
 
 
 @router.get("/slo/burn-stats", tags=["slo"])
 async def slo_burn_stats(
-    request: Request, hours: float = 24.0,
+    request: Request, hours: float = 24.0, venue_id: str | None = None,
     _p: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> dict:
-    """Burn-alert response analytics over a trailing window.
+    """Burn-alert response analytics: counts, suppression ratio, active state.
 
-    Aggregates the ack/silence audit trail into counts and a suppression ratio
-    (silences vs acknowledgements), plus the count of currently-active
-    acks/silences. Helps spot alerts that are habitually silenced rather than
-    acted on.
+    Reads pre-aggregated counters first (no audit scan); falls back to the audit
+    trail when counters are empty (e.g. fresh KV after restart). Optional
+    ``venue_id`` filter.
     """
-    import time as _t
-    from datetime import datetime, timezone
-
     ctx = _ctx(request)
-    entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
-    cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600
-    counts = {"ack": 0, "silence": 0, "unack": 0, "unsilence": 0}
+    counts: dict[str, int]
     per_target: dict[str, dict[str, int]] = {}
-    for e in entries:
-        if e.at.timestamp() < cutoff:
-            continue
-        verb = e.action.replace("burn.", "")
-        if verb in counts:
-            counts[verb] += 1
-            t = per_target.setdefault(e.resource_id, {"ack": 0, "silence": 0})
-            if verb in t:
-                t[verb] += 1
-    acks = counts["ack"]
-    silences = counts["silence"]
+    most_silenced: list[dict] = []
+
+    if await ctx.burn_counters.any_recorded():
+        counts = await ctx.burn_counters.totals(venue_id)
+    else:
+        from datetime import datetime, timezone
+
+        entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
+        cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600
+        counts = {"ack": 0, "silence": 0, "unack": 0, "unsilence": 0}
+        for e in entries:
+            if e.at.timestamp() < cutoff:
+                continue
+            verb = e.action.replace("burn.", "")
+            if verb in counts:
+                counts[verb] += 1
+                t = per_target.setdefault(e.resource_id, {"ack": 0, "silence": 0})
+                if verb in t:
+                    t[verb] += 1
+        most_silenced = sorted(
+            ({"target": k, **v} for k, v in per_target.items()),
+            key=lambda r: r["silence"], reverse=True,
+        )[:5]
+
+    acks = counts.get("ack", 0)
+    silences = counts.get("silence", 0)
     denom = acks + silences
     suppression_ratio = round(silences / denom, 3) if denom else 0.0
-    # Targets most often silenced (candidate noisy alerts).
-    noisy = sorted(
-        ({"target": k, **v} for k, v in per_target.items()),
-        key=lambda r: r["silence"], reverse=True,
-    )[:5]
     active = await ctx.burn_acks.active_summary()
+    if venue_id is not None:
+        active_acks = sum(1 for a in active["acks"] if _scope_match(ctx, a, venue_id))
+        active_silences = sum(1 for s in active["silences"] if _scope_match(ctx, s, venue_id))
+    else:
+        active_acks = len(active["acks"])
+        active_silences = len(active["silences"])
     return {
-        "window_hours": hours,
-        "counts": counts,
+        "window_hours": hours, "venue_id": venue_id, "counts": counts,
         "suppression_ratio": suppression_ratio,
-        "active_acks": len(active["acks"]),
-        "active_silences": len(active["silences"]),
-        "most_silenced": noisy,
+        "active_acks": active_acks, "active_silences": active_silences,
+        "most_silenced": most_silenced,
     }
+
+
+def _scope_match(ctx, entry: dict, venue_id: str) -> bool:
+    slo_id = entry.get("slo_id", "")
+    slo = next((x for x in ctx.slo_engine.slos if x.id == slo_id), None)
+    if slo is None:
+        return False
+    return ctx.entity_venue.venue_for(slo.service_id) == venue_id
 
 
 @router.get("/slo/burn-alerts", response_model=BurnAlertList, tags=["slo"])
@@ -202,6 +297,18 @@ class _SilenceBody(BaseModel):
     minutes: float = 60.0
 
 
+async def _burn_venue_for(ctx, slo_id: str):
+    """Resolve the owning venue for an SLO id (for venue-keyed counters)."""
+    try:
+        await ctx.ensure_entity_venue_map()
+        slo = next((x for x in ctx.slo_engine.slos if x.id == slo_id), None)
+        if slo is not None:
+            return ctx.entity_venue.venue_for(slo.service_id)
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 @router.post("/slo/burn-alerts/{slo_id}/ack", tags=["slo"])
 async def ack_burn_alert(
     slo_id: str, body: _AckBody, request: Request,
@@ -218,6 +325,7 @@ async def ack_burn_alert(
         )
     except Exception:  # noqa: BLE001
         pass
+    await ctx.burn_counters.record("ack", await _burn_venue_for(ctx, slo_id))
     return {"acknowledged": True, "by": rec.acked_by, "at": rec.acked_at}
 
 
@@ -237,6 +345,7 @@ async def silence_burn_alert(
         )
     except Exception:  # noqa: BLE001
         pass
+    await ctx.burn_counters.record("silence", await _burn_venue_for(ctx, slo_id))
     return {"silenced": True, "until": rec.until, "by": rec.by}
 
 

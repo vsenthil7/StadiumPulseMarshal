@@ -46,9 +46,21 @@ class AppContext:
         self.kv = build_kv(self.settings.redis_url)
         from app.services.hash_burn_ack_store import HashBurnAckStore
 
-        self.burn_acks = HashBurnAckStore(
-            self.kv, ack_ttl_seconds=self.settings.burn_ack_ttl_seconds,
-        )
+        if getattr(self.repos, "database", None) is not None:
+            from app.services.sql_burn_ack_store import SqlBurnAckStore
+
+            self.burn_acks = SqlBurnAckStore(
+                self.repos.database,
+                ack_ttl_seconds=self.settings.burn_ack_ttl_seconds,
+            )
+        else:
+            self.burn_acks = HashBurnAckStore(
+                self.kv, ack_ttl_seconds=self.settings.burn_ack_ttl_seconds,
+            )
+        from app.services.burn_counters import BurnCounters
+
+        self.burn_counters = BurnCounters(self.kv)
+        self.digest_scheduler = None
         from app.services.schedule_source import build_schedule_source
 
         self.schedule_source = build_schedule_source(
@@ -202,6 +214,7 @@ class AppContext:
     async def analytics(
         self, principal_venues: list[str] | None = None,
         venue_filter: str | None = None,
+        suppression_window_hours: float = 24.0,
     ) -> AnalyticsSummary:
         """Compute analytics, optionally scoped to a venue or a principal's
         venues. ``principal_venues=None`` means cross-venue (no restriction)."""
@@ -256,7 +269,7 @@ class AppContext:
             from datetime import datetime, timezone
 
             audit = await self.audit.query(resource_type="burn_alert", limit=10_000)
-            cutoff = datetime.now(timezone.utc).timestamp() - 24 * 3600
+            cutoff = datetime.now(timezone.utc).timestamp() - suppression_window_hours * 3600
             n_ack = n_sil = 0
             for e in audit:
                 if e.at.timestamp() < cutoff:
@@ -371,6 +384,13 @@ class AppContext:
         await self.repos.init()
         self.relay.start()
         self.prune_scheduler.start()
+        if self.settings.burn_digest_enabled:
+            from app.services.digest_service import DigestScheduler
+
+            self.digest_scheduler = DigestScheduler(
+                self, self.settings.burn_digest_interval_seconds,
+            )
+            self.digest_scheduler.start()
 
     async def probe_readiness(self) -> dict:
         """Actively probe dependencies for the readiness endpoint."""
@@ -392,6 +412,8 @@ class AppContext:
 
     async def shutdown(self) -> None:
         await self.prune_scheduler.stop()
+        if getattr(self, "digest_scheduler", None) is not None:
+            await self.digest_scheduler.stop()
         await self.relay.stop()
         try:
             await self.kv.close()

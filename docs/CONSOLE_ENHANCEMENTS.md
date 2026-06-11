@@ -671,3 +671,42 @@ them, so burn health sits alongside incident and SLO metrics.
 
 ### Tests
 Backend **391 pass**. Frontend `tsc -b` + `vite build` green; 7 node RBAC tests.
+
+---
+
+## Round 20 — Counters, configurable window, venue breakdown, chart UX, digest, SQL durability, compose
+
+### Pre-aggregated counters
+Burn ack/silence actions increment KV-hash counters (per action, per venue,
+hourly buckets), so `burn-stats` and `burn-trend` no longer scan the audit trail
+on every call — they read counters first and fall back to the audit only when
+counters are empty (fresh KV after restart).
+
+### Configurable suppression window
+The analytics suppression KPIs accept a `suppression_window_hours` parameter
+end-to-end (API + dashboard fetch).
+
+### Venue filter + per-venue breakdown
+`burn-stats`/`burn-trend` accept a `venue_id` filter, and `/slo/burn-by-venue`
+returns per-venue page/ticket and active ack/silence counts, shown as a table on
+the On-call page.
+
+### Trend chart UX
+The suppression trend gained hover tooltips (counts + bucket time) and a
+three-point time axis.
+
+### Burn/suppression digest
+A config-gated `DigestScheduler` periodically composes and dispatches a
+burn/suppression summary; `GET /slo/burn-digest` previews the message.
+
+### SQL-durable ack/silence store
+`SqlBurnAckStore` persists acknowledgements/silences in a `burn_acks` table so
+they survive restarts; the app selects it when `DATABASE_URL` is set, else the
+KV hash store. A full-app boot test confirms the table is created before use.
+
+### Compose
+Both replicas receive `DATABASE_URL` and share a `spm-data` volume for the
+SQLite ack DB (use Postgres for true multi-writer concurrency).
+
+### Tests
+Backend **404 pass** (+13 this round). Frontend `tsc -b` + `vite build` green.

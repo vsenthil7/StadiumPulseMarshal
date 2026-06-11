@@ -111,8 +111,10 @@ export const apiExt = {
       (r) => r.incident,
     ),
   getSLO: () => http<{ budgets: ErrorBudget[] }>('/slo').then((r) => r.budgets),
-  getAnalytics: () =>
-    http<{ summary: AnalyticsSummary }>('/analytics').then((r) => r.summary),
+  getAnalytics: (suppressionWindowHours?: number) =>
+    http<{ summary: AnalyticsSummary }>(
+      `/analytics${suppressionWindowHours != null ? `?suppression_window_hours=${suppressionWindowHours}` : ''}`,
+    ).then((r) => r.summary),
   getAnalyticsByVenue: () =>
     http<{ venues: VenueAnalytics[] }>('/analytics/by-venue').then((r) => r.venues),
   getBurnAlerts: () =>
@@ -162,11 +164,18 @@ export const apiExt = {
       active_acks: number; active_silences: number;
       most_silenced: { target: string; ack: number; silence: number }[];
     }>(`/slo/burn-stats?hours=${hours}`),
-  getBurnTrend: (hours = 24, buckets = 12) =>
-    http<{
-      window_hours: number; bucket_width_seconds: number;
+  getBurnTrend: (hours = 24, buckets = 12, venueId?: string) => {
+    const q = new URLSearchParams({ hours: String(hours), buckets: String(buckets) });
+    if (venueId) q.set('venue_id', venueId);
+    return http<{
+      window_hours: number; bucket_width_seconds: number; venue_id: string | null;
       buckets: { index: number; ack: number; silence: number; unack: number; unsilence: number; start_epoch: number }[];
-    }>(`/slo/burn-trend?hours=${hours}&buckets=${buckets}`),
+    }>(`/slo/burn-trend?${q.toString()}`);
+  },
+  getBurnByVenue: () =>
+    http<{ venues: { venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number }[] }>(
+      '/slo/burn-by-venue',
+    ),
   getOnCall: () =>
     http<{
       roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];

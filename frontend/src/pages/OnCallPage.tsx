@@ -33,6 +33,7 @@ export function OnCallPage() {
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
   const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
+  const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number }[]>([]);
   const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +53,7 @@ export function OnCallPage() {
       .finally(() => ok && setLoading(false));
     apiExt.getBurnStats(24).then((s) => ok && setStats(s)).catch(() => ok && setStats(null));
     apiExt.getBurnTrend(24, 12).then((t) => ok && setTrend(t.buckets)).catch(() => ok && setTrend([]));
+    apiExt.getBurnByVenue().then((r) => ok && setByVenue(r.venues)).catch(() => ok && setByVenue([]));
     loadHistory('');
     return () => {
       ok = false;
@@ -192,6 +194,30 @@ export function OnCallPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {byVenue.length > 0 && (
+        <div className="panel">
+          <header><h3>Burn by venue</h3></header>
+          <div className="body">
+            <table className="data-table">
+              <thead>
+                <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th></tr>
+              </thead>
+              <tbody>
+                {byVenue.map((v) => (
+                  <tr key={v.venue_id}>
+                    <td>{v.venue_id}</td>
+                    <td>{v.page}</td>
+                    <td>{v.ticket}</td>
+                    <td>{v.active_acks}</td>
+                    <td>{v.active_silences}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

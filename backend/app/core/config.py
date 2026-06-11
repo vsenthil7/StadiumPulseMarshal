@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     oncall_rotation_enabled: bool = Field(default=True)
     oncall_shift_hours: float = Field(default=12.0)
     burn_ack_ttl_seconds: float = Field(default=4 * 3600)
+    # Burn/suppression digest (periodic summary). Disabled by default.
+    burn_digest_enabled: bool = Field(default=False)
+    burn_digest_interval_seconds: float = Field(default=3600.0)
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

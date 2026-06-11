@@ -1,5 +1,8 @@
-// Suppression trend: stacked ack/silence bars per time bucket, rendered as a
-// compact inline SVG (no chart lib). Acks in accent, silences in warning tone.
+// Suppression trend: stacked ack/silence bars per time bucket as compact inline
+// SVG (no chart lib). Hover shows counts + bucket start time; a 3-point time
+// axis (start / mid / end) is rendered beneath.
+import { useState } from 'react';
+
 interface Bucket {
   index: number;
   ack: number;
@@ -7,7 +10,13 @@ interface Bucket {
   start_epoch: number;
 }
 
+function hhmm(epoch: number): string {
+  const d = new Date(epoch * 1000);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export function SuppressionTrend({ buckets }: { buckets: Bucket[] }) {
+  const [hover, setHover] = useState<number | null>(null);
   if (buckets.length === 0) return null;
   const max = Math.max(1, ...buckets.map((b) => b.ack + b.silence));
   const W = 320;
@@ -15,40 +24,48 @@ export function SuppressionTrend({ buckets }: { buckets: Bucket[] }) {
   const gap = 2;
   const bw = (W - gap * (buckets.length - 1)) / buckets.length;
 
+  const hb = hover != null ? buckets[hover] : null;
+
   return (
-    <svg
-      className="suppression-trend"
-      viewBox={`0 0 ${W} ${H}`}
-      width="100%"
-      height={H}
-      role="img"
-      aria-label="Suppression trend"
-      data-testid="suppression-trend"
-    >
-      {buckets.map((b, i) => {
-        const x = i * (bw + gap);
-        const ackH = (b.ack / max) * (H - 4);
-        const silH = (b.silence / max) * (H - 4);
-        const total = ackH + silH;
-        return (
-          <g key={b.index}>
-            <rect
-              x={x}
-              y={H - silH}
-              width={bw}
-              height={silH}
-              fill="var(--warn, #d68020)"
-            />
-            <rect
-              x={x}
-              y={H - total}
-              width={bw}
-              height={ackH}
-              fill="var(--accent, #1f6feb)"
-            />
-          </g>
-        );
-      })}
-    </svg>
+    <div className="trend-svg-wrap" style={{ position: 'relative' }}>
+      <svg
+        className="suppression-trend"
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        height={H}
+        role="img"
+        aria-label="Suppression trend"
+        data-testid="suppression-trend"
+      >
+        {buckets.map((b, i) => {
+          const x = i * (bw + gap);
+          const ackH = (b.ack / max) * (H - 4);
+          const silH = (b.silence / max) * (H - 4);
+          const total = ackH + silH;
+          return (
+            <g
+              key={b.index}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+            >
+              {/* invisible full-height hit area for easier hover */}
+              <rect x={x} y={0} width={bw} height={H} fill="transparent" />
+              <rect x={x} y={H - silH} width={bw} height={silH} fill="var(--warn, #d68020)" />
+              <rect x={x} y={H - total} width={bw} height={ackH} fill="var(--accent, #1f6feb)" />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="trend-axis">
+        <span>{hhmm(buckets[0].start_epoch)}</span>
+        <span>{hhmm(buckets[Math.floor(buckets.length / 2)].start_epoch)}</span>
+        <span>{hhmm(buckets[buckets.length - 1].start_epoch)}</span>
+      </div>
+      {hb && (
+        <div className="trend-tooltip" data-testid="trend-tooltip">
+          {hhmm(hb.start_epoch)} · {hb.ack} ack / {hb.silence} silence
+        </div>
+      )}
+    </div>
   );
 }

@@ -74,6 +74,15 @@ class OutboxRow(Base):
     document: Mapped[dict] = mapped_column(JSON)
 
 
+class BurnAckRow(Base):
+    __tablename__ = "burn_acks"
+    # key = "{slo_id}:{severity}" with a kind discriminator (ack|silence).
+    kind: Mapped[str] = mapped_column(String, primary_key=True)
+    field: Mapped[str] = mapped_column(String, primary_key=True)
+    expires_at: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class AuditLogRow(Base):
     __tablename__ = "audit_log"
     id: Mapped[str] = mapped_column(String, primary_key=True)

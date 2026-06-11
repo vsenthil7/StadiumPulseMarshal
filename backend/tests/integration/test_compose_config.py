@@ -45,3 +45,20 @@ def test_verifier_script_present_and_executable():
     script = ROOT / "scripts" / "verify_multi_instance.sh"
     assert script.is_file()
     assert "429" in script.read_text()  # asserts the shared limit trips
+
+
+# ── Round 20: durable storage wiring ────────────────────────────────────────
+def test_compose_passes_database_url_to_replicas():
+    yaml = pytest.importorskip("yaml")
+    cfg = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    for app in ("app1", "app2"):
+        env = cfg["services"][app]["environment"]
+        assert any("DATABASE_URL=" in e for e in env), app
+        # both mount the shared data volume for the sqlite db
+        assert any("/data" in v for v in cfg["services"][app].get("volumes", []))
+
+
+def test_compose_declares_data_volume():
+    yaml = pytest.importorskip("yaml")
+    cfg = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    assert "spm-data" in (cfg.get("volumes") or {})

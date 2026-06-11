@@ -983,3 +983,87 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **BH2:** docs + package.
 
 ### Round 19 — COMPLETE
+
+---
+
+## Round 20 — Pre-agg counters, configurable window, venue filter, chart axes, digest, SQL durability, compose
+
+### Track BI — pre-aggregated burn counters (drop audit scans)
+| # | Sprint | Status |
+|---|--------|--------|
+| BI1 | BurnCounters: KV-hash counters per action[/venue][/time-bucket] | 🟢 |
+| BI2 | Increment on ack/silence/unack/unsilence (alongside audit) | 🟢 |
+| BI3 | burn-stats/trend read counters first; audit fallback | 🟢 |
+| BI4 | Tests: counter increments; stats match | 🟢 |
+
+### Track BJ — configurable suppression window (end-to-end)
+| # | Sprint | Status |
+|---|--------|--------|
+| BJ1 | analytics summary suppression window param (hours) | 🟢 |
+| BJ2 | dashboard control to pick window; passes through | 🟢 |
+| BJ3 | Tests + tsc/build | 🟢 |
+
+### Track BK — venue filter on trend/stats + per-venue burn breakdown
+| # | Sprint | Status |
+|---|--------|--------|
+| BK1 | burn-stats/trend accept venue filter; counters keyed by venue | 🟢 |
+| BK2 | /slo/burn-by-venue: per-venue page/ticket/active counts | 🟢 |
+| BK3 | Frontend: venue breakdown on On-call page | 🟢 |
+| BK4 | Tests: venue-scoped counts | 🟢 |
+
+### Track BL — trend chart tooltips + time axis
+| # | Sprint | Status |
+|---|--------|--------|
+| BL1 | SuppressionTrend: hover tooltip (counts + time) | 🟢 |
+| BL2 | Time-axis labels (start/mid/end) | 🟢 |
+| BL3 | tsc/build | 🟢 |
+
+### Track BM — burn/suppression digest (scheduled summary)
+| # | Sprint | Status |
+|---|--------|--------|
+| BM1 | DigestService: compose burn+suppression summary message | 🟢 |
+| BM2 | Scheduler (interval) dispatches digest to a channel; config gate | 🟢 |
+| BM3 | GET /slo/burn-digest preview endpoint | 🟢 |
+| BM4 | Tests: digest composes; scheduler idempotent start/stop | 🟢 |
+
+### Track BN — SQL-durable ack/silence store
+| # | Sprint | Status |
+|---|--------|--------|
+| BN1 | BurnAckRow table; SQL ack repo (upsert/get/delete/list) | 🟢 |
+| BN2 | SqlBurnAckStore parity w/ hash store; build by DATABASE_URL | 🟢 |
+| BN3 | Context selects SQL store when DB configured, else hash(KV) | 🟢 |
+| BN4 | Tests: persists across store instances (same DB) | 🟢 |
+
+### Track BO — compose stack (Docker host close-out)
+| # | Sprint | Status |
+|---|--------|--------|
+| BO1 | compose: pass DATABASE_URL + REDIS_URL to both replicas | 🟢 |
+| BO2 | verify script asserts shared ack across replicas (best-effort) | 🟢 |
+| BO3 | config-validation tests for the extended compose | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| BP1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| BP2 | Docs + package | 🟢 |
+
+### Round 20 changelog (all 7 items)
+- **BI — pre-aggregated counters:** BurnCounters (KV-hash, per-action + per-venue,
+  hourly buckets) incremented on ack/silence/unack/unsilence; burn-stats & trend
+  read counters first, audit fallback. +tests.
+- **BJ — configurable suppression window:** suppression_window_hours flows through
+  /analytics → ctx.analytics; frontend getAnalytics(window). +tests.
+- **BK — venue filter + breakdown:** venue_id on stats/trend; /slo/burn-by-venue;
+  On-call "Burn by venue" table. +tests. Live-verified.
+- **BL — trend chart UX:** SuppressionTrend hover tooltip + 3-point time axis.
+- **BM — digest:** DigestService/DigestScheduler (config-gated, idempotent),
+  GET /slo/burn-digest preview, wired into startup/shutdown. +tests. Live-verified.
+- **BN — SQL-durable ack store:** BurnAckRow table + SqlBurnAckStore (parity);
+  context selects SQL when DATABASE_URL set, else hash(KV). Full-app boot+ack test
+  confirms table-creation ordering. +tests.
+- **BO — compose:** DATABASE_URL + shared spm-data volume on both replicas (honest
+  SQLite-vs-Postgres note); config-validation tests.
+- **BP1:** backend **404 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **BP2:** docs + package.
+
+### Round 20 — COMPLETE
