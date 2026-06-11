@@ -279,3 +279,38 @@ tick, signs out if a rotation is rejected, and revokes the family on logout.
 ### Tests
 Backend **269 pass** (+12 this round: entity/SLO/analytics scoping + refresh
 rotation/reuse/logout). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 7 — Persistent refresh-token store + Dynatrace zone→venue mapping
+
+### Durable, prunable refresh-token store
+The refresh-token rotation from Round 6 now runs over a `RefreshTokenRepository`
+with two implementations:
+- **memory** (demo / tests), and
+- **SQL** (a `refresh_tokens` table) selected automatically when `DATABASE_URL`
+  is set.
+
+`RefreshStore` is async over the repo and keeps the same guarantees (rotation,
+reuse-detection family revocation, logout revoke), adding `prune()` to clear
+expired/consumed/revoked rows. Verified live against SQLite: rotation works,
+reuse is 401, and rows persist across the process.
+
+### Dynatrace management-zone → venue mapping
+Venue ownership for entity-keyed domains (SLO/analytics/entities) no longer
+relies on a bespoke field. The `EntityVenueResolver` derives venue from an
+entity's **management-zone tag** (e.g. `mz:Arena North`) via a configurable map:
+
+```
+VENUE_ZONE_MAP=Arena North=venue_arena_north,Olympic Park=venue_olympic_park
+VENUE_ZONE_TAG_KEY=mz
+```
+
+Resolution priority is: explicit `venue_id` first (demo / already-mapped), then
+the management-zone tag. This is the realistic live-tenant path — entities that
+arrive from Dynatrace tagged only with a management zone resolve to a venue
+without any code change. Mock entities now carry `mz:` tags to exercise it.
+
+### Tests
+Backend **278 pass** (+9 this round: async store, SQL rotation+prune, 7 resolver
+cases incl. the live zone-only shape). Frontend `tsc -b` + `vite build` green.

@@ -77,7 +77,7 @@ class AppContext:
         self.entity_venue = EntityVenueResolver()
         from app.services.refresh_store import RefreshStore
 
-        self.refresh_tokens = RefreshStore()
+        self.refresh_tokens = RefreshStore(repo=self.repos.refresh_tokens)
         self.current_scenario = self._initial_scenario()
 
     async def ensure_entity_venue_map(self) -> None:
@@ -85,7 +85,11 @@ class AppContext:
         if not self.entity_venue.loaded:
             try:
                 entities = await self.client.list_entities()
-                self.entity_venue.load(entities)
+                self.entity_venue.load(
+                    entities,
+                    zone_mapping=self.settings.venue_zone_mapping,
+                    zone_tag_key=self.settings.venue_zone_tag_key,
+                )
             except Exception:  # pragma: no cover - defensive
                 self.entity_venue.load([])
 

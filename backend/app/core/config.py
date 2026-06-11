@@ -79,6 +79,24 @@ class Settings(BaseSettings):
     # demo IdP that doesn't sign tokens.
     oidc_verify_signature: bool = Field(default=True)
 
+    # --- Dynatrace management-zone → venue mapping ---
+    # In a live tenant, venue ownership comes from a Dynatrace management zone or
+    # an entity tag rather than a hardcoded id. This maps a zone/tag value to a
+    # venue id. Format: "Zone A=venue_arena_north,Zone B=venue_olympic_park".
+    # The entity-tag key that carries the zone name (default: "mz").
+    venue_zone_map: str = Field(default="")
+    venue_zone_tag_key: str = Field(default="mz")
+
+    @property
+    def venue_zone_mapping(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.venue_zone_map.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
     @property
     def oidc_enabled(self) -> bool:
         return bool(self.oidc_issuer and self.oidc_client_id and self.oidc_redirect_uri)

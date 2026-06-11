@@ -116,7 +116,7 @@ async def login(body: LoginIn, request: Request) -> dict:
         token = _jwt.encode(payload, _secret(request), algorithm="HS256")
 
     # Start a refresh-token family for silent renewal with rotation.
-    refresh_token, _family = request.app.state.ctx.refresh_tokens.issue(
+    refresh_token, _family = await request.app.state.ctx.refresh_tokens.issue(
         body.email.lower()
     )
 
@@ -186,9 +186,9 @@ async def refresh(
     store = request.app.state.ctx.refresh_tokens
 
     if body.refresh_token:
-        subject = store.subject_for(body.refresh_token)
+        subject = await store.subject_for(body.refresh_token)
         try:
-            rotated = store.rotate(body.refresh_token)
+            rotated = await store.rotate(body.refresh_token)
         except ReuseError as exc:
             raise UnauthorizedError(
                 "Refresh token reuse detected; session revoked"
@@ -216,7 +216,7 @@ async def refresh(
 async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
     """Revoke the active refresh-token family so it cannot be rotated again."""
     if body.refresh_token:
-        request.app.state.ctx.refresh_tokens.revoke_token(body.refresh_token)
+        await request.app.state.ctx.refresh_tokens.revoke_token(body.refresh_token)
     return {"ok": True}
 
 

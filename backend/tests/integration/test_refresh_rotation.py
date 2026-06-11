@@ -1,6 +1,7 @@
 """OIDC/session refresh-token rotation, theft detection and revocation."""
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -20,42 +21,54 @@ def _login(c: TestClient) -> dict:
     return r.json()
 
 
-# ── store unit behaviour ────────────────────────────────────────────────────
-def test_store_rotation_issues_new_token_same_family():
+# ── store unit behaviour (async, memory-backed by default) ──────────────────
+@pytest.mark.asyncio
+async def test_store_rotation_issues_new_token_same_family():
     s = RefreshStore()
-    t1, fam = s.issue("alice")
-    rotated = s.rotate(t1)
+    t1, fam = await s.issue("alice")
+    rotated = await s.rotate(t1)
     assert rotated is not None
     t2, fam2 = rotated
     assert t2 != t1
     assert fam2 == fam  # same family
-    assert s.subject_for(t2) == "alice"
+    assert await s.subject_for(t2) == "alice"
     # the old token is now consumed
-    assert s.subject_for(t1) is None
+    assert await s.subject_for(t1) is None
 
 
-def test_store_reuse_revokes_family():
+@pytest.mark.asyncio
+async def test_store_reuse_revokes_family():
     s = RefreshStore()
-    t1, fam = s.issue("bob")
-    t2, _ = s.rotate(t1)
+    t1, fam = await s.issue("bob")
+    t2, _ = await s.rotate(t1)
     # replaying t1 (already rotated) is theft → ReuseError + family revoked
-    try:
-        s.rotate(t1)
-        assert False, "expected ReuseError"
-    except ReuseError:
-        pass
-    assert s.is_family_revoked(fam)
+    with pytest.raises(ReuseError):
+        await s.rotate(t1)
+    assert await s.is_family_revoked(fam)
     # and the previously-valid t2 is now dead too
-    assert s.rotate(t2) is None
-    assert s.subject_for(t2) is None
+    assert await s.rotate(t2) is None
+    assert await s.subject_for(t2) is None
 
 
-def test_store_revoke_token():
+@pytest.mark.asyncio
+async def test_store_revoke_token():
     s = RefreshStore()
-    t1, fam = s.issue("carol")
-    s.revoke_token(t1)
-    assert s.is_family_revoked(fam)
-    assert s.rotate(t1) is None
+    t1, fam = await s.issue("carol")
+    await s.revoke_token(t1)
+    assert await s.is_family_revoked(fam)
+    assert await s.rotate(t1) is None
+
+
+@pytest.mark.asyncio
+async def test_store_prune_removes_dead_records():
+    s = RefreshStore()
+    t1, _ = await s.issue("dave")
+    t2, _ = await s.issue("erin")
+    # consume t1 (rotation) and revoke t2's family → both prunable
+    await s.rotate(t1)
+    await s.revoke_token(t2)
+    removed = await s.prune()
+    assert removed >= 2
 
 
 # ── endpoint behaviour ──────────────────────────────────────────────────────
@@ -98,3 +111,30 @@ def test_invalid_refresh_token_rejected():
     with _client() as c:
         assert c.post("/api/v1/auth/refresh",
                       json={"refresh_token": "nonsense"}).status_code == 401
+
+
+# ── SQL-backed store (durability + prune) ───────────────────────────────────
+@pytest.mark.asyncio
+async def test_sql_backed_rotation_and_prune(tmp_path):
+    from app.repositories.sql.database import Database
+    from app.repositories.refresh_tokens import SQLRefreshTokenRepository
+
+    db = Database(f"sqlite+aiosqlite:///{tmp_path/'rt.db'}")
+    await db.create_all()
+    try:
+        s = RefreshStore(repo=SQLRefreshTokenRepository(db))
+        t1, fam = await s.issue("sql-user")
+        # rotation works against SQL
+        rotated = await s.rotate(t1)
+        assert rotated is not None
+        t2, fam2 = rotated
+        assert fam2 == fam and t2 != t1
+        # reuse of t1 → family revoked
+        with pytest.raises(ReuseError):
+            await s.rotate(t1)
+        assert await s.rotate(t2) is None
+        # prune clears consumed/revoked rows
+        removed = await s.prune()
+        assert removed >= 1
+    finally:
+        await db.dispose()

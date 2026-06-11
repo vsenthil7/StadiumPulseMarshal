@@ -39,19 +39,19 @@ def payment_db_saturation() -> Scenario:
 
     entities = [
         Entity(id="SVC-PAYMENTS", name="payments-api", type=EntityType.SERVICE,
-               tags=["matchday", "tier:critical"], health=62.0,
+               tags=["matchday", "tier:critical", "mz:Arena North"], health=62.0,
                venue_id="venue_arena_north"),
         Entity(id="DB-PAYMENTS", name="payments-postgres", type=EntityType.DATABASE,
-               tags=["matchday", "tier:critical"], health=41.0,
+               tags=["matchday", "tier:critical", "mz:Arena North"], health=41.0,
                venue_id="venue_arena_north"),
         Entity(id="SVC-TICKETS", name="ticket-scan-api", type=EntityType.SERVICE,
-               tags=["matchday", "tier:critical", "gates"], health=98.0,
+               tags=["matchday", "tier:critical", "gates", "mz:Arena North"], health=98.0,
                venue_id="venue_arena_north"),
         Entity(id="SVC-APP", name="fan-app-backend", type=EntityType.APPLICATION,
-               tags=["matchday", "tier:high"], health=88.0,
+               tags=["matchday", "tier:high", "mz:Olympic Park"], health=88.0,
                venue_id="venue_olympic_park"),
         Entity(id="HOST-EDGE-3", name="edge-node-3", type=EntityType.HOST,
-               tags=["edge", "stadium-east"], health=95.0,
+               tags=["edge", "stadium-east", "mz:Arena North"], health=95.0,
                venue_id="venue_arena_north"),
     ]
     rc = RootCauseNode(

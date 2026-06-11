@@ -306,3 +306,51 @@ Both tracks, full scope.
 - **X2:** docs + package.
 
 ### Round 6 — COMPLETE
+
+---
+
+## Round 7 — Persistent refresh-token store + Dynatrace management-zone venue mapping
+
+### Track C — persistent, prunable refresh-token store
+| # | Sprint | Status |
+|---|--------|--------|
+| C1 | RefreshTokenRepository protocol; memory + SQL implementations | 🟢 |
+| C2 | RefreshStore uses the repo (async); preserve rotation/reuse/revoke | 🟢 |
+| C3 | Prune expired/consumed tokens (sweep) + on-access cleanup | 🟢 |
+| C4 | Wire repo into context via repository factory (memory/sql by config) | 🟢 |
+| C5 | Tests: SQL-backed rotation/reuse/revoke + prune; suite green | 🟢 |
+
+### Track D — Dynatrace management-zone → venue mapping
+| # | Sprint | Status |
+|---|--------|--------|
+| D1 | Config: venue↔management-zone map; entity tag→venue convention | 🟢 |
+| D2 | Resolver derives venue from entity tags/management zones | 🟢 |
+| D3 | Mock client entities carry management-zone tags (realistic) | 🟢 |
+| D4 | Tests: tag/zone-based venue resolution + fallback | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| Z1 | Full backend suite + frontend tsc/build green | 🟢 |
+| Z2 | Docs + package | 🟢 |
+
+### Round 7 changelog
+- **Track C — persistent refresh-token store (C1–C5):** new
+  `RefreshTokenRepository` protocol with memory + SQL implementations
+  (`refresh_tokens` table, JSON-free typed columns). `RefreshStore` is now async
+  over the repo, preserving rotation / reuse-revocation / family-revoke, and adds
+  `prune()` for expired/consumed/revoked rows. Wired through the repository
+  factory (SQL when DATABASE_URL set, else memory). +5 tests (async store, SQL
+  rotation + prune). Live-verified: rotation + reuse-401 with rows persisted in
+  SQLite.
+- **Track D — Dynatrace management-zone → venue mapping (D1–D4):** resolver now
+  derives venue from an entity's management-zone tag (e.g. `mz:Arena North`) via
+  a configurable `VENUE_ZONE_MAP`, with explicit `venue_id` taking priority.
+  Mock entities carry realistic `mz:` tags. This is the live-tenant path: an
+  entity with no bespoke `venue_id` still resolves by zone. +7 resolver tests
+  (zone resolution, venue_id priority, custom tag key, unmapped/no-tag fallback,
+  live zone-only shape).
+- **Z1:** backend **278 pass**; frontend `tsc -b` + `vite build` green.
+- **Z2:** docs + package.
+
+### Round 7 — COMPLETE

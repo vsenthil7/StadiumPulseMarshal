@@ -36,6 +36,7 @@ class RepositoryBundle:
     slo: SLORepository
     outbox: object = None
     audit_log: object = None
+    refresh_tokens: object = None
     # Optional SQL database handle (for lifecycle management).
     database: object | None = None
 
@@ -64,6 +65,8 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
 
         db = Database(settings.database_url)
         log.info("Using SQL persistence: %s", settings.database_url)
+        from app.repositories.refresh_tokens import SQLRefreshTokenRepository
+
         return RepositoryBundle(
             incidents=SQLIncidentRepository(db),
             remediations=SQLRemediationRepository(db),
@@ -72,6 +75,7 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
             slo=SQLSLORepository(db),
             outbox=SQLOutboxRepository(db),
             audit_log=SQLAuditLogRepository(db),
+            refresh_tokens=SQLRefreshTokenRepository(db),
             database=db,
         )
 
@@ -80,6 +84,7 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
         MemoryAuditLogRepository,
         MemoryOutboxRepository,
     )
+    from app.repositories.refresh_tokens import MemoryRefreshTokenRepository
 
     return RepositoryBundle(
         incidents=MemoryIncidentRepository(),
@@ -89,4 +94,5 @@ def build_repositories(settings: Settings) -> RepositoryBundle:
         slo=MemorySLORepository(),
         outbox=MemoryOutboxRepository(),
         audit_log=MemoryAuditLogRepository(),
+        refresh_tokens=MemoryRefreshTokenRepository(),
     )

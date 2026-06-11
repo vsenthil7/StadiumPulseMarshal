@@ -50,6 +50,16 @@ class NotificationRow(Base):
     document: Mapped[dict] = mapped_column(JSON)
 
 
+class RefreshTokenRow(Base):
+    __tablename__ = "refresh_tokens"
+    token: Mapped[str] = mapped_column(String, primary_key=True)
+    family_id: Mapped[str] = mapped_column(String, index=True)
+    subject: Mapped[str] = mapped_column(String, index=True)
+    expires_at: Mapped[float] = mapped_column(Float, index=True)
+    consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
 class BudgetRow(Base):
     __tablename__ = "error_budgets"
     slo_id: Mapped[str] = mapped_column(String, primary_key=True)

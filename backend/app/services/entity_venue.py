@@ -16,8 +16,35 @@ class EntityVenueResolver:
         self._map: dict[str, str] = {}
         self._loaded = False
 
-    def load(self, entities: list[Entity]) -> None:
-        self._map = {e.id: e.venue_id for e in entities if e.venue_id}
+    def load(
+        self,
+        entities: list[Entity],
+        zone_mapping: dict[str, str] | None = None,
+        zone_tag_key: str = "mz",
+    ) -> None:
+        """Build the entity→venue map.
+
+        Venue is resolved per entity in priority order:
+        1. an explicit ``venue_id`` on the entity (demo / already-tagged);
+        2. a management-zone tag (e.g. ``mz:Arena North``) mapped to a venue via
+           ``zone_mapping`` — the realistic Dynatrace path, where venue ownership
+           lives in a management zone rather than a bespoke field.
+        """
+        zone_mapping = zone_mapping or {}
+        prefix = f"{zone_tag_key}:"
+        result: dict[str, str] = {}
+        for e in entities:
+            venue = e.venue_id
+            if venue is None:
+                for tag in e.tags:
+                    if tag.startswith(prefix):
+                        zone = tag[len(prefix):]
+                        venue = zone_mapping.get(zone)
+                        if venue:
+                            break
+            if venue:
+                result[e.id] = venue
+        self._map = result
         self._loaded = True
 
     def invalidate(self) -> None:
