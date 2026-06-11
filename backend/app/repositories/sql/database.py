@@ -97,10 +97,45 @@ class Database:
     """Holds the engine + session factory and creates tables on init."""
 
     def __init__(self, url: str) -> None:
+        self._url = url
         self._engine: AsyncEngine = create_async_engine(url, future=True)
         self._session_factory = async_sessionmaker(
             self._engine, expire_on_commit=False, class_=AsyncSession
         )
+
+    async def init_schema(self) -> None:
+        """Run Alembic ``upgrade head`` when alembic + ini are available
+        (production), else fall back to ``create_all`` (tests / minimal env).
+
+        In-memory SQLite can't be migrated by Alembic (it opens a separate
+        connection to a distinct in-memory DB), so those always use create_all.
+        """
+        if ":memory:" in self._url:
+            await self.create_all()
+            return
+        try:
+            import asyncio
+            import os
+
+            from alembic import command as alembic_cmd
+            from alembic.config import Config as AlembicConfig
+
+            here = os.path.dirname(os.path.abspath(__file__))
+            backend_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
+            ini = os.path.join(backend_root, "alembic.ini")
+            if not os.path.exists(ini):
+                raise FileNotFoundError(ini)
+            cfg = AlembicConfig(ini)
+            cfg.set_main_option("script_location", os.path.join(backend_root, "alembic"))
+            sync_url = self._url.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg2")
+            cfg.set_main_option("sqlalchemy.url", sync_url)
+            await asyncio.get_event_loop().run_in_executor(
+                None, alembic_cmd.upgrade, cfg, "head")
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning(
+                "alembic upgrade unavailable (%s); using create_all", exc)
+            await self.create_all()
 
     async def create_all(self) -> None:
         async with self._engine.begin() as conn:

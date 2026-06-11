@@ -42,7 +42,7 @@ class RepositoryBundle:
 
     async def init(self) -> None:
         if self.database is not None:
-            await self.database.create_all()  # type: ignore[attr-defined]
+            await self.database.init_schema()  # type: ignore[attr-defined]
 
     async def dispose(self) -> None:
         if self.database is not None:
