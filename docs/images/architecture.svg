@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 640" font-family="'IBM Plex Sans', Segoe UI, sans-serif">
+  <rect width="1100" height="640" fill="#ffffff"/>
+  <text x="40" y="44" fill="#11202e" font-size="22" font-weight="700">StadiumPulse Marshal — Architecture</text>
+  <text x="40" y="68" fill="#7387a0" font-size="13">100% agentic AIOps: Dynatrace MCP (observability + Davis AI) + Google ADK/Gemini (reasoning), human-in-the-loop remediation.</text>
+
+  <!-- frontend -->
+  <rect x="40" y="100" width="300" height="180" rx="12" fill="#eef5f1" stroke="#0b6e4f"/>
+  <text x="60" y="128" fill="#08543c" font-size="14" font-weight="700">Frontend — War-room console</text>
+  <text x="60" y="150" fill="#43566a" font-size="12">React + Vite + TypeScript</text>
+  <text x="60" y="172" fill="#43566a" font-size="12">• Live problem feed (WebSocket)</text>
+  <text x="60" y="192" fill="#43566a" font-size="12">• Root-cause tree + timeline</text>
+  <text x="60" y="212" fill="#43566a" font-size="12">• Agent analysis</text>
+  <text x="60" y="232" fill="#43566a" font-size="12">• HITL approve / reject / apply</text>
+  <text x="60" y="252" fill="#43566a" font-size="12">• Configurable guardrails, mobile</text>
+
+  <!-- backend -->
+  <rect x="400" y="100" width="320" height="300" rx="12" fill="#f4f6f9" stroke="#cbd4e0"/>
+  <text x="420" y="128" fill="#11202e" font-size="14" font-weight="700">Backend — FastAPI (Cloud Run)</text>
+
+  <rect x="420" y="144" width="280" height="58" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+  <text x="434" y="166" fill="#11202e" font-size="12" font-weight="600">API surface /api/v1</text>
+  <text x="434" y="186" fill="#43566a" font-size="11">problems · agent/analyze · remediations · audit · /stream</text>
+
+  <rect x="420" y="212" width="280" height="62" rx="8" fill="#fdf6ec" stroke="#c8870f"/>
+  <text x="434" y="234" fill="#11202e" font-size="12" font-weight="600">Reasoning agent (ADK / Gemini)</text>
+  <text x="434" y="252" fill="#43566a" font-size="11">Correlates root-cause ↔ matchday phase,</text>
+  <text x="434" y="267" fill="#43566a" font-size="11">ranks remediations, drafts runbooks.</text>
+
+  <rect x="420" y="284" width="135" height="58" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+  <text x="434" y="306" fill="#11202e" font-size="12" font-weight="600">Remediation</text>
+  <text x="434" y="324" fill="#43566a" font-size="11">planner + store</text>
+  <text x="434" y="338" fill="#43566a" font-size="11">+ audit log</text>
+
+  <rect x="565" y="284" width="135" height="58" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+  <text x="579" y="306" fill="#11202e" font-size="12" font-weight="600">Guardrails</text>
+  <text x="579" y="324" fill="#43566a" font-size="11">auto-approve</text>
+  <text x="579" y="338" fill="#43566a" font-size="11">severity ceiling</text>
+
+  <rect x="420" y="352" width="280" height="36" rx="8" fill="#eef1f5" stroke="#cbd4e0"/>
+  <text x="434" y="375" fill="#43566a" font-size="11">Client/agent factories · USE_MOCKS flag · auto-fallback</text>
+
+  <!-- external -->
+  <rect x="780" y="100" width="280" height="120" rx="12" fill="#eaf1fc" stroke="#1455c0"/>
+  <text x="800" y="128" fill="#0d3a8a" font-size="14" font-weight="700">Dynatrace</text>
+  <text x="800" y="150" fill="#43566a" font-size="12">MCP server + Environment API v2</text>
+  <text x="800" y="170" fill="#43566a" font-size="12">• Problems / entities / events</text>
+  <text x="800" y="190" fill="#43566a" font-size="12">• Davis AI causal root-cause</text>
+  <text x="800" y="210" fill="#43566a" font-size="12">• Metrics</text>
+
+  <rect x="780" y="240" width="280" height="100" rx="12" fill="#fdf2ec" stroke="#d9622b"/>
+  <text x="800" y="268" fill="#9c3d12" font-size="14" font-weight="700">Google Cloud</text>
+  <text x="800" y="290" fill="#43566a" font-size="12">• Gemini (Vertex AI / AI Studio)</text>
+  <text x="800" y="310" fill="#43566a" font-size="12">• Agent Builder / ADK</text>
+  <text x="800" y="330" fill="#43566a" font-size="12">• Cloud Run hosting</text>
+
+  <!-- mock path -->
+  <rect x="780" y="360" width="280" height="64" rx="12" fill="#f4f6f9" stroke="#cbd4e0" stroke-dasharray="5 4"/>
+  <text x="800" y="386" fill="#43566a" font-size="13" font-weight="700">Mock fixtures (no-creds path)</text>
+  <text x="800" y="406" fill="#7387a0" font-size="11">Deterministic matchday incident scenario</text>
+
+  <!-- arrows -->
+  <g stroke="#7387a0" stroke-width="1.6" fill="none" marker-end="url(#arr)">
+    <path d="M340 190 H400"/>
+    <path d="M720 200 H780 V160 H780"/>
+    <path d="M720 250 H750 V290 H780"/>
+    <path d="M780 392 H752 V360 H720"/>
+  </g>
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0 0 L9 4.5 L0 9 z" fill="#7387a0"/>
+    </marker>
+  </defs>
+  <text x="346" y="184" fill="#7387a0" font-size="10">HTTP / WS</text>
+  <text x="726" y="194" fill="#7387a0" font-size="10">MCP</text>
+  <text x="726" y="284" fill="#7387a0" font-size="10">SDK</text>
+
+  <text x="40" y="470" fill="#11202e" font-size="14" font-weight="700">Request flow (triage → remediate)</text>
+  <text x="40" y="496" fill="#43566a" font-size="12">1. Console subscribes to /stream and lists problems from the observability client (live Dynatrace or mock).</text>
+  <text x="40" y="516" fill="#43566a" font-size="12">2. Operator selects a problem → POST /agent/analyze. The agent pulls Davis-AI root-cause, correlates with the matchday phase,</text>
+  <text x="40" y="536" fill="#43566a" font-size="12">    and returns ranked remediations with runbooks.</text>
+  <text x="40" y="556" fill="#43566a" font-size="12">3. Guardrails may auto-approve low-risk actions within the severity ceiling; everything else awaits a human.</text>
+  <text x="40" y="576" fill="#43566a" font-size="12">4. Operator approves/rejects (recorded in the audit log), then applies the runbook — the execute step that would dispatch</text>
+  <text x="40" y="596" fill="#43566a" font-size="12">    to automation in live mode.</text>
+
+  <text x="40" y="626" fill="#7387a0" font-size="12" font-style="italic">Figure A — System architecture and the triage-to-remediation request flow.</text>
+</svg>

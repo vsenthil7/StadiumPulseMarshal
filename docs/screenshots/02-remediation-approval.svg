@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1366 880" font-family="'IBM Plex Sans', Segoe UI, sans-serif">
+  <rect width="1366" height="880" fill="#f4f6f9"/>
+  <text x="384" y="44" fill="#43566a" font-size="12" font-weight="600" letter-spacing="0.6">RECOMMENDED REMEDIATIONS — HUMAN APPROVAL</text>
+
+  <!-- remediation card 1 (approved -> apply) -->
+  <rect x="384" y="60" width="958" height="290" rx="7" fill="#f1f9f4" stroke="#2f8f5b"/>
+  <text x="404" y="92" fill="#11202e" font-size="15" font-weight="600">Increase database connection pool ceiling</text>
+  <rect x="1208" y="76" width="118" height="20" rx="5" fill="#fcf3e0"/>
+  <text x="1267" y="90" fill="#c8870f" font-size="10.5" font-weight="700" text-anchor="middle">MEDIUM RISK</text>
+  <text x="404" y="116" fill="#43566a" font-size="13">Raise max_connections and the service-side pool size to absorb the matchday surge, then recycle saturated connections.</text>
+  <text x="404" y="140" fill="#7387a0" font-size="12">Estimated MTTR: 6 min   ·   Status:  <tspan fill="#2f8f5b" font-weight="700">APPROVED</tspan></text>
+  <!-- runbook -->
+  <g font-size="13">
+    <circle cx="414" cy="166" r="10" fill="#11202e"/><text x="414" y="170" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">1</text>
+    <text x="436" y="170" fill="#43566a">Confirm pool saturation in Dynatrace metric db.connections.active == max.</text>
+    <circle cx="414" cy="196" r="10" fill="#11202e"/><text x="414" y="200" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">2</text>
+    <text x="436" y="200" fill="#43566a">Apply temporary max_connections increase (e.g. 100 → 200).</text>
+    <circle cx="414" cy="226" r="10" fill="#11202e"/><text x="414" y="230" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">3</text>
+    <text x="436" y="230" fill="#43566a">Scale service connection pool to match.</text>
+    <circle cx="414" cy="256" r="10" fill="#11202e"/><text x="414" y="260" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">4</text>
+    <text x="436" y="260" fill="#43566a">Verify p95 latency recovers below 300ms.</text>
+  </g>
+  <rect x="404" y="296" width="78" height="26" rx="6" fill="#e7f4ec"/>
+  <text x="443" y="313" fill="#2f8f5b" font-size="11" font-weight="700" text-anchor="middle">Approved</text>
+  <rect x="494" y="294" width="130" height="30" rx="7" fill="#0b6e4f"/>
+  <text x="559" y="314" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">Apply runbook</text>
+
+  <!-- remediation card 2 (pending) -->
+  <rect x="384" y="366" width="958" height="250" rx="7" fill="#ffffff" stroke="#e2e7ee"/>
+  <text x="404" y="398" fill="#11202e" font-size="15" font-weight="600">Enable read-replica offload</text>
+  <rect x="1228" y="382" width="98" height="20" rx="5" fill="#e7f4ec"/>
+  <text x="1277" y="396" fill="#2f8f5b" font-size="10.5" font-weight="700" text-anchor="middle">LOW RISK</text>
+  <text x="404" y="422" fill="#43566a" font-size="13">Route read-only payment status checks to a replica to relieve the primary.</text>
+  <text x="404" y="446" fill="#7387a0" font-size="12">Estimated MTTR: 4 min   ·   Status:  <tspan fill="#c8870f" font-weight="700">PROPOSED</tspan></text>
+  <g font-size="13">
+    <circle cx="414" cy="472" r="10" fill="#11202e"/><text x="414" y="476" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">1</text>
+    <text x="436" y="476" fill="#43566a">Confirm replica lag &lt; 1s.</text>
+    <circle cx="414" cy="502" r="10" fill="#11202e"/><text x="414" y="506" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">2</text>
+    <text x="436" y="506" fill="#43566a">Flip read traffic to replica via feature flag.</text>
+    <circle cx="414" cy="532" r="10" fill="#11202e"/><text x="414" y="536" fill="#fff" font-size="11" text-anchor="middle" font-family="'IBM Plex Mono', monospace">3</text>
+    <text x="436" y="536" fill="#43566a">Monitor primary connection count.</text>
+  </g>
+  <rect x="404" y="556" width="490" height="34" rx="7" fill="#ffffff" stroke="#cbd4e0"/>
+  <text x="416" y="578" fill="#7387a0" font-size="12.5">Decision note (optional) — e.g. 'surge confirmed on East kiosks'</text>
+  <rect x="404" y="598" width="120" height="34" rx="7" fill="#0b6e4f"/>
+  <text x="464" y="620" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">Approve</text>
+  <rect x="534" y="598" width="90" height="34" rx="7" fill="#ffffff" stroke="#c4314b"/>
+  <text x="579" y="620" fill="#c4314b" font-size="13" font-weight="600" text-anchor="middle">Reject</text>
+
+  <!-- audit -->
+  <rect x="384" y="632" width="958" height="150" rx="10" fill="#ffffff" stroke="#e2e7ee"/>
+  <rect x="384" y="632" width="958" height="40" rx="10" fill="#fafbfc"/>
+  <rect x="384" y="658" width="958" height="14" fill="#fafbfc"/>
+  <line x1="384" y1="672" x2="1342" y2="672" stroke="#e2e7ee"/>
+  <text x="400" y="657" fill="#43566a" font-size="12" font-weight="600" letter-spacing="0.6">DECISION AUDIT LOG</text>
+  <rect x="1300" y="645" width="30" height="20" rx="10" fill="#11202e"/>
+  <text x="1315" y="659" fill="#fff" font-size="12" font-weight="600" text-anchor="middle" font-family="'IBM Plex Mono', monospace">1</text>
+  <rect x="400" y="696" width="84" height="24" rx="6" fill="#e7f4ec"/>
+  <text x="442" y="712" fill="#2f8f5b" font-size="11" font-weight="700" text-anchor="middle">APPROVED</text>
+  <text x="500" y="712" fill="#11202e" font-size="13" font-weight="600">sre-jane</text>
+  <text x="580" y="712" fill="#7387a0" font-size="13">surge confirmed on East kiosks</text>
+  <text x="1190" y="712" fill="#7387a0" font-size="11" font-family="'IBM Plex Mono', monospace">13 Jun 20:47</text>
+
+  <text x="384" y="836" fill="#7387a0" font-size="12" font-style="italic">Figure 2 — Human-in-the-loop remediation: ranked runbooks, one-click Approve / Reject, an Apply step after approval, and an audit log of every decision.</text>
+</svg>

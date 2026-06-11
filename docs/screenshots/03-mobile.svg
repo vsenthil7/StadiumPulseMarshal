@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 720" font-family="'IBM Plex Sans', Segoe UI, sans-serif">
+  <rect width="820" height="720" fill="#eef1f5"/>
+  <defs>
+    <linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b6e4f"/><stop offset="1" stop-color="#0e8a63"/></linearGradient>
+  </defs>
+
+  <!-- phone A: drawer open -->
+  <g transform="translate(40,40)">
+    <rect width="340" height="640" rx="28" fill="#11202e"/>
+    <rect x="10" y="10" width="320" height="620" rx="20" fill="#f4f6f9"/>
+    <!-- topbar -->
+    <rect x="10" y="10" width="320" height="48" rx="20" fill="#ffffff"/>
+    <rect x="10" y="38" width="320" height="20" fill="#ffffff"/>
+    <rect x="24" y="24" width="28" height="22" rx="6" fill="#ffffff" stroke="#cbd4e0"/>
+    <line x1="31" y1="31" x2="45" y2="31" stroke="#43566a" stroke-width="2"/>
+    <line x1="31" y1="35" x2="45" y2="35" stroke="#43566a" stroke-width="2"/>
+    <line x1="31" y1="39" x2="45" y2="39" stroke="#43566a" stroke-width="2"/>
+    <rect x="60" y="23" width="24" height="24" rx="6" fill="url(#m)"/>
+    <text x="72" y="39" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">SP</text>
+    <text x="92" y="37" fill="#11202e" font-size="12" font-weight="700">StadiumPulse</text>
+    <line x1="10" y1="58" x2="330" y2="58" stroke="#e2e7ee"/>
+    <!-- feed drawer open -->
+    <rect x="10" y="58" width="250" height="572" fill="#ffffff"/>
+    <line x1="260" y1="58" x2="260" y2="630" stroke="#e2e7ee"/>
+    <text x="26" y="84" fill="#43566a" font-size="10" font-weight="600" letter-spacing="0.5">LIVE PROBLEM FEED</text>
+    <rect x="222" y="72" width="24" height="16" rx="8" fill="#11202e"/>
+    <text x="234" y="84" fill="#fff" font-size="10" text-anchor="middle" font-family="'IBM Plex Mono', monospace">2</text>
+    <!-- card active -->
+    <rect x="10" y="96" width="250" height="78" fill="#eef5f1"/>
+    <rect x="10" y="96" width="3" height="78" fill="#0b6e4f"/>
+    <rect x="26" y="108" width="36" height="15" rx="4" fill="#d9622b"/>
+    <text x="44" y="119" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">HIGH</text>
+    <rect x="68" y="108" width="58" height="15" rx="4" fill="#eaf1fc"/>
+    <text x="97" y="119" fill="#1455c0" font-size="9" font-weight="600" text-anchor="middle" font-family="'IBM Plex Mono', monospace">Half Time</text>
+    <text x="26" y="142" fill="#11202e" font-size="12" font-weight="600">Payment processing</text>
+    <text x="26" y="158" fill="#11202e" font-size="12" font-weight="600">degraded</text>
+    <text x="26" y="172" fill="#7387a0" font-size="9">P-2026-0613-001 · OPEN</text>
+    <line x1="10" y1="174" x2="260" y2="174" stroke="#e2e7ee"/>
+    <!-- card 2 -->
+    <rect x="26" y="186" width="48" height="15" rx="4" fill="#c8870f"/>
+    <text x="50" y="197" fill="#fff" font-size="9" font-weight="700" text-anchor="middle">MEDIUM</text>
+    <text x="26" y="220" fill="#11202e" font-size="12" font-weight="600">Fan app latency</text>
+    <text x="26" y="234" fill="#7387a0" font-size="9">P-2026-0613-002 · OPEN</text>
+    <!-- scrim -->
+    <rect x="260" y="58" width="70" height="572" fill="#11202e" opacity="0.3"/>
+    <text x="0" y="666" fill="#7387a0" font-size="11" transform="translate(20,0)">Feed drawer open</text>
+  </g>
+
+  <!-- phone B: detail -->
+  <g transform="translate(440,40)">
+    <rect width="340" height="640" rx="28" fill="#11202e"/>
+    <rect x="10" y="10" width="320" height="620" rx="20" fill="#f4f6f9"/>
+    <rect x="10" y="10" width="320" height="48" rx="20" fill="#ffffff"/>
+    <rect x="10" y="38" width="320" height="20" fill="#ffffff"/>
+    <rect x="24" y="24" width="28" height="22" rx="6" fill="#ffffff" stroke="#cbd4e0"/>
+    <line x1="31" y1="31" x2="45" y2="31" stroke="#43566a" stroke-width="2"/>
+    <line x1="31" y1="35" x2="45" y2="35" stroke="#43566a" stroke-width="2"/>
+    <line x1="31" y1="39" x2="45" y2="39" stroke="#43566a" stroke-width="2"/>
+    <rect x="60" y="23" width="24" height="24" rx="6" fill="url(#m)"/>
+    <text x="72" y="39" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">SP</text>
+    <rect x="246" y="25" width="74" height="18" rx="9" fill="#fafbfc" stroke="#cbd4e0"/>
+    <circle cx="258" cy="34" r="3" fill="#c8870f"/>
+    <text x="266" y="38" fill="#43566a" font-size="9" font-family="'IBM Plex Mono', monospace">MOCK</text>
+    <line x1="10" y1="58" x2="330" y2="58" stroke="#e2e7ee"/>
+    <!-- detail -->
+    <text x="26" y="86" fill="#11202e" font-size="15" font-weight="700">Payment processing</text>
+    <text x="26" y="104" fill="#11202e" font-size="15" font-weight="700">degraded</text>
+    <text x="26" y="124" fill="#43566a" font-size="10">Concession payments failing for ~12% of</text>
+    <text x="26" y="138" fill="#43566a" font-size="10">fans at half-time.</text>
+    <!-- root cause card -->
+    <rect x="22" y="152" width="296" height="40" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+    <text x="34" y="177" fill="#43566a" font-size="10" font-weight="600" letter-spacing="0.5">DAVIS AI ROOT-CAUSE</text>
+    <rect x="22" y="200" width="296" height="74" rx="8" fill="#fdf2ec" stroke="#d9622b"/>
+    <text x="36" y="222" fill="#11202e" font-size="12" font-weight="600" font-family="'IBM Plex Mono', monospace">payments-postgres</text>
+    <rect x="36" y="230" width="74" height="14" rx="4" fill="#d9622b"/>
+    <text x="73" y="240" fill="#fff" font-size="8.5" font-weight="700" text-anchor="middle">ROOT CAUSE</text>
+    <text x="36" y="258" fill="#43566a" font-size="10">Connection pool exhausted at surge.</text>
+    <rect x="36" y="264" width="270" height="4" rx="2" fill="#e2e7ee"/>
+    <rect x="36" y="264" width="246" height="4" rx="2" fill="#d9622b"/>
+    <!-- agent -->
+    <rect x="22" y="284" width="296" height="40" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+    <text x="34" y="309" fill="#43566a" font-size="10" font-weight="600" letter-spacing="0.5">AGENT ANALYSIS</text>
+    <!-- remediation -->
+    <rect x="22" y="332" width="296" height="120" rx="8" fill="#ffffff" stroke="#e2e7ee"/>
+    <text x="36" y="356" fill="#11202e" font-size="12" font-weight="600">Increase DB pool ceiling</text>
+    <rect x="220" y="344" width="86" height="16" rx="4" fill="#fcf3e0"/>
+    <text x="263" y="356" fill="#c8870f" font-size="9" font-weight="700" text-anchor="middle">MEDIUM RISK</text>
+    <rect x="36" y="408" width="120" height="30" rx="7" fill="#0b6e4f"/>
+    <text x="96" y="428" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">Approve</text>
+    <rect x="166" y="408" width="80" height="30" rx="7" fill="#ffffff" stroke="#c4314b"/>
+    <text x="206" y="428" fill="#c4314b" font-size="12" font-weight="600" text-anchor="middle">Reject</text>
+    <text x="20" y="666" fill="#7387a0" font-size="11">Detail view, single column</text>
+  </g>
+
+  <text x="40" y="706" fill="#7387a0" font-size="12" font-style="italic">Figure 3 — Mobile (responsive): collapsible feed drawer (left) and single-column triage + approval (right). Same data, touch-friendly.</text>
+</svg>

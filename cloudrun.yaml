@@ -1,0 +1,28 @@
+# Cloud Run service descriptor. Deploy with:
+#   gcloud run services replace cloudrun.yaml --region=europe-west2
+# or simply:
+#   gcloud run deploy stadiumpulse-marshal --source . --region=europe-west2 \
+#     --set-env-vars USE_MOCKS=false,GOOGLE_CLOUD_PROJECT=$PROJECT
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: stadiumpulse-marshal
+spec:
+  template:
+    spec:
+      containers:
+        - image: gcr.io/PROJECT_ID/stadiumpulse-marshal:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: USE_MOCKS
+              value: "false"
+            - name: GOOGLE_CLOUD_LOCATION
+              value: "europe-west2"
+            - name: GEMINI_MODEL
+              value: "gemini-2.0-flash"
+            # Inject DT_* and GOOGLE_* secrets via Secret Manager bindings.
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
