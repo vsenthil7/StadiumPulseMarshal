@@ -1130,3 +1130,60 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **BV2:** docs + package.
 
 ### Round 21 — COMPLETE
+
+---
+
+## Round 22 — Digest webhook hop, net-active baseline, per-venue suppression, daily digest
+
+### Track BW — digest final hop to real webhook
+| # | Sprint | Status |
+|---|--------|--------|
+| BW1 | WebhookDispatcher.post_message(url,payload) one-shot w/ retry | 🟢 |
+| BW2 | notify_digest posts to BURN_DIGEST_WEBHOOK_URL when set | 🟢 |
+| BW3 | Tests: posts to URL (MockTransport); no URL → store only | 🟢 |
+
+### Track BX — net-active baseline carried into trend
+| # | Sprint | Status |
+|---|--------|--------|
+| BX1 | burn-trend computes pre-window net baseline from counters | 🟢 |
+| BX2 | net_active starts from baseline; expose baseline in payload | 🟢 |
+| BX3 | Tests: baseline reflects pre-window silences | 🟢 |
+
+### Track BY — per-venue suppression ratio
+| # | Sprint | Status |
+|---|--------|--------|
+| BY1 | burn-by-venue adds ack/silence counts + suppression ratio | 🟢 |
+| BY2 | Frontend chart/table shows suppression per venue | 🟢 |
+| BY3 | Tests: per-venue ratio | 🟢 |
+
+### Track BZ — scheduled daily digest (distinct from hourly)
+| # | Sprint | Status |
+|---|--------|--------|
+| BZ1 | Daily digest scheduler (24h) w/ own config + channel | 🟢 |
+| BZ2 | compose_daily_digest: 24h rollup summary (counts, top venues) | 🟢 |
+| BZ3 | /slo/burn-digest?kind=daily preview; both schedulers in startup | 🟢 |
+| BZ4 | Tests: daily compose; scheduler gates | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| CA1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| CA2 | Docs + package | 🟢 |
+
+### Round 22 changelog
+- **BW — digest webhook hop:** WebhookDispatcher.post_message (one-shot, retry/
+  backoff); notify_digest POSTs to BURN_DIGEST_WEBHOOK_URL when set and records
+  SENT/FAILED on the notification. +tests. Live-verified (unreachable host →
+  FAILED status recorded, dispatch path real).
+- **BX — net-active baseline:** burn-trend computes a pre-window net baseline from
+  counters and seeds the running net_active; baseline exposed in payload. +test.
+  Live-verified (baseline=1 from a pre-window silence).
+- **BY — per-venue suppression:** burn-by-venue adds ack/silence counts +
+  suppression_ratio per venue; On-call table shows a Suppr. column. +test.
+- **BZ — daily digest:** compose_daily_digest (24h rollup w/ top venues); /slo/
+  burn-digest?kind=daily preview; separate daily scheduler (BURN_DAILY_DIGEST_*).
+  +tests. Live-verified.
+- **CA1:** backend **415 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **CA2:** docs + package.
+
+### Round 22 — COMPLETE

@@ -16,6 +16,36 @@ from app.core.logging import get_logger
 log = get_logger(__name__)
 
 
+async def compose_daily_digest(ctx) -> str:
+    """A 24h rollup digest: lifetime response totals, suppression, active state,
+    and the venues with the most burn pressure. Distinct from the hourly
+    heads-up — meant as an end-of-day summary."""
+    totals = await ctx.burn_counters.totals()
+    acks = totals.get("ack", 0)
+    sils = totals.get("silence", 0)
+    denom = acks + sils
+    ratio = round(100 * sils / denom) if denom else 0
+    active = await ctx.burn_acks.active_summary()
+    alerts = await ctx.burn_alerts()
+    # rank venues by current page+ticket pressure
+    by_venue: dict[str, int] = {}
+    for a in alerts:
+        vid = a.venue_id or "unassigned"
+        by_venue[vid] = by_venue.get(vid, 0) + 1
+    top = sorted(by_venue.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    lines = [
+        "StadiumPulse daily burn summary (24h)",
+        f"- Response: {acks} acks, {sils} silences (suppression {ratio}%)",
+        f"- Currently: {len(active['acks'])} acknowledged, "
+        f"{len(active['silences'])} silenced",
+        f"- Active alerts: {len(alerts)}",
+    ]
+    if top:
+        lines.append("- Top venues: " +
+                     ", ".join(f"{v.replace('venue_', '')} ({n})" for v, n in top))
+    return "\n".join(lines)
+
+
 _SEV_RANK = {"none": 0, "ticket": 1, "page": 2}
 
 
@@ -65,12 +95,14 @@ class DigestScheduler:
 
     def __init__(self, ctx, interval_seconds: float,
                  dispatch: Callable[[str], Awaitable[None]] | None = None,
-                 window_hours: float = 24.0, min_severity: str = "ticket") -> None:
+                 window_hours: float = 24.0, min_severity: str = "ticket",
+                 composer: Callable[..., Awaitable[str]] | None = None) -> None:
         self._ctx = ctx
         self._interval = interval_seconds
         self._dispatch = dispatch
         self._window_hours = window_hours
         self._min_severity = min_severity
+        self._composer = composer
         self._task: asyncio.Task | None = None
 
     def start(self) -> None:
@@ -92,8 +124,11 @@ class DigestScheduler:
         while True:
             try:
                 await asyncio.sleep(self._interval)
-                msg = await compose_digest(
-                    self._ctx, self._window_hours, self._min_severity)
+                if self._composer is not None:
+                    msg = await self._composer(self._ctx)
+                else:
+                    msg = await compose_digest(
+                        self._ctx, self._window_hours, self._min_severity)
                 if self._dispatch is not None:
                     await self._dispatch(msg)
                 else:

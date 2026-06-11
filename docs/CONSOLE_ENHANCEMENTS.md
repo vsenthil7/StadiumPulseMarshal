@@ -739,3 +739,29 @@ existing table.
 
 ### Tests
 Backend **409 pass** (+5 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 22 — Digest webhook hop, net-active baseline, per-venue suppression, daily digest
+
+### Digest reaches a real webhook
+`WebhookDispatcher.post_message` does a one-shot POST with the same retry/backoff
+as event delivery. When `BURN_DIGEST_WEBHOOK_URL` is set, `notify_digest` posts
+the message out-of-band and records SENT/FAILED on the notification, so a failed
+delivery is visible rather than silent.
+
+### Net-active baseline
+The trend now seeds its running net-active silence count from a pre-window
+baseline (cumulative silence − unsilence before the window), so silences opened
+earlier and still in effect are reflected from the first bucket.
+
+### Per-venue suppression
+`/slo/burn-by-venue` carries per-venue ack/silence counts and a suppression
+ratio, shown as a column on the On-call venue table.
+
+### Daily digest
+A distinct 24h rollup (`compose_daily_digest`, with top burn venues) runs on its
+own daily scheduler and channel; preview via `GET /slo/burn-digest?kind=daily`.
+
+### Tests
+Backend **415 pass** (+6 this round). Frontend `tsc -b` + `vite build` green.

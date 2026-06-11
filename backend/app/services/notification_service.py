@@ -81,8 +81,15 @@ class NotificationService:
         return notification
 
     async def notify_digest(self, message: str, channel=None,
-                            recipient: str = "#slo-alerts") -> Notification:
-        """Dispatch a burn/suppression digest as a notification on a channel."""
+                            recipient: str = "#slo-alerts",
+                            webhook_url: str | None = None,
+                            webhook_poster=None) -> Notification:
+        """Dispatch a burn/suppression digest as a notification on a channel.
+
+        If a ``webhook_url`` and ``webhook_poster`` are provided, also POSTs the
+        message out-of-band (the real final hop); delivery success is recorded on
+        the notification status.
+        """
         ch = channel or NotificationChannel.SLACK
         n = Notification(
             id=_new_id(), incident_id=None,
@@ -90,7 +97,21 @@ class NotificationService:
             channel=ch, recipient=recipient,
             subject="StadiumPulse burn digest", body=message,
         )
-        return await self._dispatch(n)
+        await self._repo.add(n)
+        delivered = True
+        if webhook_url and webhook_poster is not None:
+            try:
+                delivered = await webhook_poster(
+                    webhook_url,
+                    {"text": message, "channel": recipient,
+                     "source": "burn_digest"},
+                )
+            except Exception:  # noqa: BLE001
+                delivered = False
+        n.status = NotificationStatus.SENT if delivered else NotificationStatus.FAILED
+        n.sent_at = datetime.now(timezone.utc)
+        await self._repo.update(n)
+        return n
 
     async def list_for_incident(self, incident_id: str) -> list[Notification]:
         return await self._repo.list(incident_id=incident_id)

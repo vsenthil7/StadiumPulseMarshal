@@ -61,6 +61,7 @@ class AppContext:
 
         self.burn_counters = BurnCounters(self.kv)
         self.digest_scheduler = None
+        self.daily_digest_scheduler = None
         from app.services.schedule_source import build_schedule_source
 
         self.schedule_source = build_schedule_source(
@@ -394,7 +395,9 @@ class AppContext:
 
             async def _dispatch_digest(msg: str) -> None:
                 await self.notifications.notify_digest(
-                    msg, channel=ch, recipient=self.settings.burn_digest_recipient)
+                    msg, channel=ch, recipient=self.settings.burn_digest_recipient,
+                    webhook_url=self.settings.burn_digest_webhook_url,
+                    webhook_poster=self.webhook_dispatcher.post_message)
 
             self.digest_scheduler = DigestScheduler(
                 self, self.settings.burn_digest_interval_seconds,
@@ -403,6 +406,26 @@ class AppContext:
                 min_severity=self.settings.burn_digest_min_severity,
             )
             self.digest_scheduler.start()
+        if self.settings.burn_daily_digest_enabled:
+            from app.services.digest_service import (
+                DigestScheduler, compose_daily_digest)
+            from app.models.notification import NotificationChannel
+
+            dch = NotificationChannel(self.settings.burn_daily_digest_channel) \
+                if self.settings.burn_daily_digest_channel in {c.value for c in NotificationChannel} \
+                else NotificationChannel.SLACK
+
+            async def _dispatch_daily(msg: str) -> None:
+                await self.notifications.notify_digest(
+                    msg, channel=dch,
+                    recipient=self.settings.burn_daily_digest_recipient,
+                    webhook_url=self.settings.burn_digest_webhook_url,
+                    webhook_poster=self.webhook_dispatcher.post_message)
+
+            self.daily_digest_scheduler = DigestScheduler(
+                self, 24 * 3600, dispatch=_dispatch_daily,
+                composer=compose_daily_digest)
+            self.daily_digest_scheduler.start()
 
     async def probe_readiness(self) -> dict:
         """Actively probe dependencies for the readiness endpoint."""
@@ -426,6 +449,8 @@ class AppContext:
         await self.prune_scheduler.stop()
         if getattr(self, "digest_scheduler", None) is not None:
             await self.digest_scheduler.stop()
+        if getattr(self, "daily_digest_scheduler", None) is not None:
+            await self.daily_digest_scheduler.stop()
         await self.relay.stop()
         try:
             await self.kv.close()

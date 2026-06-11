@@ -173,7 +173,7 @@ export const apiExt = {
     }>(`/slo/burn-trend?${q.toString()}`);
   },
   getBurnByVenue: () =>
-    http<{ venues: { venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number }[] }>(
+    http<{ venues: { venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number; ack?: number; silence?: number; suppression_ratio?: number }[] }>(
       '/slo/burn-by-venue',
     ),
   getOnCall: () =>

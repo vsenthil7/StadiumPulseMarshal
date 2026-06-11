@@ -89,17 +89,21 @@ async def slo_burn_events(
 @router.get("/slo/burn-digest", tags=["slo"])
 async def slo_burn_digest(
     request: Request, hours: float = 24.0, min_severity: str = "ticket",
-    dispatch: bool = False,
+    kind: str = "hourly", dispatch: bool = False,
     principal: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> dict:
     """Preview (or dispatch) the burn/suppression digest.
 
-    ``dispatch=true`` sends it on the configured channel (responder+ required).
+    ``kind=daily`` previews the 24h rollup summary. ``dispatch=true`` sends it on
+    the configured channel (responder+ required).
     """
-    from app.services.digest_service import compose_digest
+    from app.services.digest_service import compose_daily_digest, compose_digest
 
     ctx = _ctx(request)
-    msg = await compose_digest(ctx, hours, min_severity)
+    if kind == "daily":
+        msg = await compose_daily_digest(ctx)
+    else:
+        msg = await compose_digest(ctx, hours, min_severity)
     sent = False
     if dispatch:
         if not principal.has(Permission.REMEDIATION_APPROVE):
@@ -111,7 +115,10 @@ async def slo_burn_digest(
             if ch_name in {c.value for c in NotificationChannel} \
             else NotificationChannel.SLACK
         await ctx.notifications.notify_digest(
-            msg, channel=ch, recipient=ctx.settings.burn_digest_recipient)
+            msg, channel=ch, recipient=ctx.settings.burn_digest_recipient,
+            webhook_url=ctx.settings.burn_digest_webhook_url,
+            webhook_poster=ctx.webhook_dispatcher.post_message,
+        )
         sent = True
     return {"digest": msg, "dispatched": sent}
 
@@ -156,6 +163,21 @@ async def slo_burn_by_venue(
         allowed = set(principal.venues)
         venues = {k: v for k, v in venues.items()
                   if k in allowed or k == "unassigned"}
+
+    # Enrich each venue with lifetime ack/silence counts + suppression ratio.
+    for vid, row in venues.items():
+        if vid == "unassigned":
+            row["ack"] = 0
+            row["silence"] = 0
+            row["suppression_ratio"] = 0.0
+            continue
+        totals = await ctx.burn_counters.totals(vid)
+        acks = totals.get("ack", 0)
+        sils = totals.get("silence", 0)
+        denom = acks + sils
+        row["ack"] = acks
+        row["silence"] = sils
+        row["suppression_ratio"] = round(sils / denom, 3) if denom else 0.0
     return {"venues": sorted(venues.values(), key=lambda r: r["venue_id"])}
 
 
@@ -216,14 +238,28 @@ async def slo_burn_trend(
             if verb in ("ack", "silence", "unack", "unsilence"):
                 series[_bucket_index(ts)][verb] += 1
 
+    # Pre-window net-active baseline: cumulative (silence - unsilence) for all
+    # counter buckets that fall before the window start, so the trend's running
+    # net reflects silences opened earlier and still in effect.
+    baseline = 0
+    if await ctx.burn_counters.any_recorded():
+        from app.services.burn_counters import BUCKET_SECONDS
+
+        pre = await ctx.burn_counters.buckets(0, venue_id)
+        for bucket_epoch, actions in pre.items():
+            if bucket_epoch < start:
+                baseline += actions.get("silence", 0) - actions.get("unsilence", 0)
+        baseline = max(0, baseline)
+
     return {"window_hours": hours, "bucket_width_seconds": round(width, 1),
-            "venue_id": venue_id, "buckets": _with_net_active(series)}
+            "venue_id": venue_id, "net_active_baseline": baseline,
+            "buckets": _with_net_active(series, baseline)}
 
 
-def _with_net_active(series: list[dict]) -> list[dict]:
-    """Annotate each bucket with a running net-active silence count
-    (cumulative silence − unsilence up to and including that bucket)."""
-    running = 0
+def _with_net_active(series: list[dict], baseline: int = 0) -> list[dict]:
+    """Annotate each bucket with a running net-active silence count, seeded with
+    a pre-window ``baseline`` (cumulative silence − unsilence up to that bucket)."""
+    running = baseline
     for b in series:
         running += b.get("silence", 0) - b.get("unsilence", 0)
         b["net_active"] = max(0, running)

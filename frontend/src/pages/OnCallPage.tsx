@@ -34,7 +34,7 @@ export function OnCallPage() {
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
   const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
-  const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number }[]>([]);
+  const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number; suppression_ratio?: number }[]>([]);
   const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -206,7 +206,7 @@ export function OnCallPage() {
             <BurnByVenueChart venues={byVenue} />
             <table className="data-table">
               <thead>
-                <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th></tr>
+                <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th><th>Suppr.</th></tr>
               </thead>
               <tbody>
                 {byVenue.map((v) => (
@@ -216,6 +216,7 @@ export function OnCallPage() {
                     <td>{v.ticket}</td>
                     <td>{v.active_acks}</td>
                     <td>{v.active_silences}</td>
+                    <td>{v.suppression_ratio != null ? `${Math.round(v.suppression_ratio * 100)}%` : '—'}</td>
                   </tr>
                 ))}
               </tbody>

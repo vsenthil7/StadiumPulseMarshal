@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     burn_digest_recipient: str = Field(default="#slo-alerts")
     burn_digest_window_hours: float = Field(default=24.0)
     burn_digest_min_severity: str = Field(default="ticket")
+    burn_digest_webhook_url: str | None = None
+    # Daily rollup digest (distinct from the hourly heads-up).
+    burn_daily_digest_enabled: bool = Field(default=False)
+    burn_daily_digest_channel: str = Field(default="slack")
+    burn_daily_digest_recipient: str = Field(default="#slo-daily")
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

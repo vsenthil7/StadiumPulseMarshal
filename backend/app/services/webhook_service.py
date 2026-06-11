@@ -62,6 +62,25 @@ class WebhookDispatcher:
     def register(self, bus: EventBus) -> None:
         bus.subscribe(None, self.on_event)
 
+    async def post_message(self, url: str, payload: dict) -> bool:
+        """One-shot POST to a specific URL with the same retry/backoff policy.
+
+        Used for out-of-band messages (e.g. the burn digest) that aren't tied to
+        a registered subscription. Returns True on a <400 response.
+        """
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                resp = await self._http.post(url, json=payload, timeout=self._timeout)
+                if resp.status_code < 400:
+                    return True
+            except Exception:  # noqa: BLE001 - retry then give up
+                pass
+            if attempt < self._max_attempts:
+                import asyncio
+
+                await asyncio.sleep(self._base_backoff * attempt)
+        return False
+
     async def on_event(self, event: DomainEvent) -> None:
         for sub in self._repo.list():
             if not sub.wants(event.type):
