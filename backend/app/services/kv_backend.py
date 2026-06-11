@@ -27,6 +27,12 @@ class KVBackend(Protocol):
     async def set(self, key: str, value: str, ttl_seconds: int | None = None) -> None: ...
     async def delete(self, key: str) -> None: ...
     async def close(self) -> None: ...
+    # Hash ops (per-field) — let callers update one field without rewriting the
+    # whole value, avoiding last-write-wins races across fields.
+    async def hset(self, key: str, field: str, value: str) -> None: ...
+    async def hget(self, key: str, field: str) -> str | None: ...
+    async def hdel(self, key: str, field: str) -> bool: ...
+    async def hgetall(self, key: str) -> dict[str, str]: ...
 
 
 class MemoryKV:
@@ -35,6 +41,7 @@ class MemoryKV:
     def __init__(self) -> None:
         self._values: dict[str, tuple[str, float | None]] = {}
         self._counters: dict[str, tuple[int, float]] = {}
+        self._hashes: dict[str, dict[str, str]] = {}
 
     def _expired(self, exp: float | None) -> bool:
         return exp is not None and exp < time.monotonic()
@@ -63,6 +70,23 @@ class MemoryKV:
     async def delete(self, key: str) -> None:
         self._values.pop(key, None)
         self._counters.pop(key, None)
+        self._hashes.pop(key, None)
+
+    async def hset(self, key: str, field: str, value: str) -> None:
+        self._hashes.setdefault(key, {})[field] = value
+
+    async def hget(self, key: str, field: str) -> str | None:
+        return self._hashes.get(key, {}).get(field)
+
+    async def hdel(self, key: str, field: str) -> bool:
+        h = self._hashes.get(key)
+        if h is not None and field in h:
+            del h[field]
+            return True
+        return False
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return dict(self._hashes.get(key, {}))
 
     async def close(self) -> None:
         return None
@@ -97,6 +121,18 @@ class RedisKV:
 
     async def delete(self, key: str) -> None:
         await self._r.delete(key)
+
+    async def hset(self, key: str, field: str, value: str) -> None:
+        await self._r.hset(key, field, value)
+
+    async def hget(self, key: str, field: str) -> str | None:
+        return await self._r.hget(key, field)
+
+    async def hdel(self, key: str, field: str) -> bool:
+        return bool(await self._r.hdel(key, field))
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return await self._r.hgetall(key) or {}
 
     async def close(self) -> None:
         try:

@@ -80,3 +80,37 @@
 |---|--------|--------|
 | AX1 | Full backend suite + frontend tsc/build + node unit green | ⚪ |
 | AX2 | Docs + package | ⚪ |
+
+---
+
+## Round 18 — Per-key hash ack store, remove legacy store, burn history UX, suppression analytics
+
+### Track AY — KV hash ops + per-key ack store (no last-write-wins)
+| # | Sprint | Status |
+|---|--------|--------|
+| AY1 | KVBackend: hset/hget/hdel/hgetall on Memory + Redis | ⚪ |
+| AY2 | HashBurnAckStore: per (slo,severity) field, no whole-doc rewrite | ⚪ |
+| AY3 | Expiry encoded per-field; prune on read; active_summary | ⚪ |
+| AY4 | Context uses hash store; remove legacy in-proc BurnAckStore | ⚪ |
+| AY5 | Tests: concurrent acks to different keys don't clobber; parity | ⚪ |
+
+### Track AZ — burn history filter / pagination / CSV
+| # | Sprint | Status |
+|---|--------|--------|
+| AZ1 | /slo/burn-events: action filter + offset/limit + fmt=csv | ⚪ |
+| AZ2 | Frontend: burn-history filter + pager + export on On-call page | ⚪ |
+| AZ3 | Tests: filter, pagination meta, csv headers | ⚪ |
+
+### Track BA — notification-suppression analytics
+| # | Sprint | Status |
+|---|--------|--------|
+| BA1 | /slo/burn-stats: ack/silence/dispatch counts over window | ⚪ |
+| BA2 | Suppression ratio (silenced vs dispatched) per severity | ⚪ |
+| BA3 | Frontend: suppression summary on On-call page | ⚪ |
+| BA4 | Tests: counts + ratio | ⚪ |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| BB1 | Full backend suite + frontend tsc/build + node unit green | ⚪ |
+| BB2 | Docs + package | ⚪ |

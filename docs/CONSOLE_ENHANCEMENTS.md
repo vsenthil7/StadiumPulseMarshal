@@ -620,3 +620,28 @@ history table.
 
 ### Tests
 Backend **384 pass** (+10 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 18 — Per-key hash ack store, burn-history UX, suppression analytics
+
+### Hash-backed ack store (no last-write-wins)
+The KV backend gained hash operations (Memory + Redis), and burn ack/silence
+state now lives in per-(slo,severity) hash fields via `HashBurnAckStore`. Acking
+or silencing one alert no longer rewrites the whole document, so concurrent
+updates to different alerts across replicas can't clobber each other (verified by
+a 20-way concurrent-ack test). The legacy in-process store was removed.
+
+### Burn-history filter / pagination / CSV
+`/slo/burn-events` supports an action filter, offset/limit pagination, and
+`fmt=csv`; the On-call page's burn-history table has matching filter buttons and
+an Export CSV control.
+
+### Suppression analytics
+`/slo/burn-stats` aggregates the ack/silence audit trail over a trailing window
+into counts, a suppression ratio (silences vs acknowledgements), active ack and
+silence counts, and the most-silenced targets — surfaced as a summary on the
+On-call page so habitually-silenced (noisy) alerts stand out.
+
+### Tests
+Backend **391 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.

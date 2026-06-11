@@ -1,7 +1,7 @@
 // On-call console: the roster (who is on each tier), the escalation policy
 // ladders, and which on-call targets a page/ticket burn alert would notify.
 // Read-only operational reference, served from GET /oncall.
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiExt } from '../api/client';
 
 interface OnCallData {
@@ -30,7 +30,16 @@ const TIER_LABEL: Record<string, string> = {
 export function OnCallPage() {
   const [data, setData] = useState<OnCallData | null>(null);
   const [history, setHistory] = useState<{ id: string; at: string; actor: string; action: string; target: string }[]>([]);
+  const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
+  const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  const loadHistory = useCallback((action: string) => {
+    apiExt
+      .getBurnEvents(action ? { action } : undefined)
+      .then((r) => setHistory(r.events))
+      .catch(() => setHistory([]));
+  }, []);
 
   useEffect(() => {
     let ok = true;
@@ -39,14 +48,12 @@ export function OnCallPage() {
       .then((d) => ok && setData(d))
       .catch(() => ok && setData(null))
       .finally(() => ok && setLoading(false));
-    apiExt
-      .getBurnEvents()
-      .then((r) => ok && setHistory(r.events))
-      .catch(() => ok && setHistory([]));
+    apiExt.getBurnStats(24).then((s) => ok && setStats(s)).catch(() => ok && setStats(null));
+    loadHistory('');
     return () => {
       ok = false;
     };
-  }, []);
+  }, [loadHistory]);
 
   if (loading) return <p className="muted">Loading on-call directory…</p>;
   if (!data) return <p className="muted">On-call directory unavailable.</p>;
@@ -156,10 +163,54 @@ export function OnCallPage() {
         </div>
       )}
 
+      {stats && (
+        <div className="panel">
+          <header><h3>Burn response (last {Math.round(stats.window_hours ?? 24)}h)</h3></header>
+          <div className="body">
+            <div className="stat-row">
+              <span className="vstat"><span className="vstat-v">{stats.counts.ack ?? 0}</span><span className="vstat-l">acks</span></span>
+              <span className="vstat"><span className="vstat-v">{stats.counts.silence ?? 0}</span><span className="vstat-l">silences</span></span>
+              <span className="vstat"><span className="vstat-v">{Math.round(stats.suppression_ratio * 100)}%</span><span className="vstat-l">suppression</span></span>
+              <span className="vstat"><span className="vstat-v">{stats.active_acks}</span><span className="vstat-l">active acks</span></span>
+              <span className="vstat"><span className="vstat-v">{stats.active_silences}</span><span className="vstat-l">active silences</span></span>
+            </div>
+            {stats.most_silenced.length > 0 && (
+              <p className="hint">
+                Most silenced: {stats.most_silenced.slice(0, 3).map((m) => `${m.target} (${m.silence}×)`).join(', ')}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {history.length > 0 && (
         <div className="panel">
           <header><h3>Burn-alert history</h3></header>
           <div className="body">
+            <div className="seg-control" role="tablist" aria-label="Filter">
+              {['', 'burn.ack', 'burn.silence'].map((f) => (
+                <button
+                  key={f || 'all'}
+                  className={`seg${histFilter === f ? ' active' : ''}`}
+                  onClick={() => {
+                    setHistFilter(f);
+                    loadHistory(f);
+                  }}
+                >
+                  {f === '' ? 'All' : f.replace('burn.', '')}
+                </button>
+              ))}
+              <button
+                className="seg export-btn"
+                onClick={() => {
+                  const q = new URLSearchParams({ fmt: 'csv' });
+                  if (histFilter) q.set('action', histFilter);
+                  window.open(`/api/v1/slo/burn-events?${q.toString()}`, '_blank');
+                }}
+              >
+                Export CSV
+              </button>
+            </div>
             <table className="data-table">
               <thead>
                 <tr><th>When</th><th>Actor</th><th>Action</th><th>Target</th></tr>

@@ -898,3 +898,22 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **AX2:** docs + package.
 
 ### Round 17 — COMPLETE
+
+### Round 18 changelog
+- **Track AY — per-key hash ack store:** KVBackend gained hset/hget/hdel/hgetall
+  (Memory + Redis); HashBurnAckStore keeps each (slo,severity) in its own hash
+  field so acking one alert never rewrites another's state — last-write-wins
+  window across fields removed (proven by a 20-way concurrent-ack test). Context
+  uses it; legacy in-proc BurnAckStore removed (its unit test retargeted). +5 tests.
+- **Track AZ — burn history UX:** /slo/burn-events gained action filter,
+  offset/limit pagination, and fmt=csv; On-call page got a history filter +
+  Export CSV. +tests. Live-verified CSV + pagination.
+- **Track BA — suppression analytics:** /slo/burn-stats aggregates ack/silence/
+  unack/unsilence counts over a window, a suppression ratio, active ack/silence
+  counts, and the most-silenced targets; On-call page shows the summary. +tests.
+  Live-verified (1 ack + 1 silence → 0.5 suppression).
+- **BB1:** backend **391 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **BB2:** docs + package.
+
+### Round 18 — COMPLETE

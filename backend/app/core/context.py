@@ -44,9 +44,9 @@ class AppContext:
         from app.services.kv_backend import build_kv
 
         self.kv = build_kv(self.settings.redis_url)
-        from app.services.shared_burn_ack_store import SharedBurnAckStore
+        from app.services.hash_burn_ack_store import HashBurnAckStore
 
-        self.burn_acks = SharedBurnAckStore(
+        self.burn_acks = HashBurnAckStore(
             self.kv, ack_ttl_seconds=self.settings.burn_ack_ttl_seconds,
         )
         from app.services.schedule_source import build_schedule_source

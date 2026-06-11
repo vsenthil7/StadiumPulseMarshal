@@ -143,11 +143,25 @@ export const apiExt = {
     http<{ cleared: boolean }>(`/slo/burn-alerts/${sloId}/silence?severity=${encodeURIComponent(severity)}`, {
       method: 'DELETE',
     }),
-  getBurnEvents: (action?: string) =>
-    http<{
+  getBurnEvents: (opts?: { action?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (opts?.action) q.set('action', opts.action);
+    if (opts?.limit != null) q.set('limit', String(opts.limit));
+    if (opts?.offset != null) q.set('offset', String(opts.offset));
+    const qs = q.toString();
+    return http<{
       events: { id: string; at: string; actor: string; action: string; target: string; detail: Record<string, unknown> }[];
-      total: number;
-    }>(`/slo/burn-events${action ? `?action=${encodeURIComponent(action)}` : ''}`),
+      total: number; offset: number; limit: number;
+    }>(`/slo/burn-events${qs ? `?${qs}` : ''}`);
+  },
+  getBurnStats: (hours = 24) =>
+    http<{
+      window_hours: number;
+      counts: Record<string, number>;
+      suppression_ratio: number;
+      active_acks: number; active_silences: number;
+      most_silenced: { target: string; ack: number; silence: number }[];
+    }>(`/slo/burn-stats?hours=${hours}`),
   getOnCall: () =>
     http<{
       roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];

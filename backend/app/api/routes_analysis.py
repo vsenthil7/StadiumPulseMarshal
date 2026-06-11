@@ -43,13 +43,14 @@ class BulkTransitionResponse(BaseModel):
 
 @router.get("/slo/burn-events", tags=["slo"])
 async def slo_burn_events(
-    request: Request, limit: int = 100, action: str | None = None,
+    request: Request, limit: int = 50, offset: int = 0,
+    action: str | None = None, fmt: str | None = None,
     _p: Principal = Depends(require_permission(Permission.REMEDIATION_APPROVE)),
-) -> dict:
+):
     """Burn-alert ack/silence audit history (responder+).
 
-    Returns burn.ack / burn.silence / burn.unack / burn.unsilence audit entries,
-    newest first. Optional ``action`` filter (e.g. ``burn.ack``).
+    burn.ack / burn.silence / burn.unack / burn.unsilence entries, newest first.
+    Supports ``action`` filter, ``offset``/``limit`` pagination, and ``fmt=csv``.
     """
     ctx = _ctx(request)
     entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
@@ -62,7 +63,76 @@ async def slo_burn_events(
         if action is None or e.action == action
     ]
     rows.sort(key=lambda r: r["at"], reverse=True)
-    return {"events": rows[:limit], "total": len(rows)}
+    total = len(rows)
+    page = rows[offset:offset + limit]
+
+    if fmt == "csv":
+        import csv
+        import io
+
+        from fastapi.responses import StreamingResponse
+
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["timestamp", "actor", "action", "target"])
+        for r in page:
+            w.writerow([r["at"], r["actor"], r["action"], r["target"]])
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]), media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=burn-events.csv"},
+        )
+
+    return {"events": page, "total": total, "offset": offset, "limit": limit}
+
+
+@router.get("/slo/burn-stats", tags=["slo"])
+async def slo_burn_stats(
+    request: Request, hours: float = 24.0,
+    _p: Principal = Depends(require_permission(Permission.SLO_READ)),
+) -> dict:
+    """Burn-alert response analytics over a trailing window.
+
+    Aggregates the ack/silence audit trail into counts and a suppression ratio
+    (silences vs acknowledgements), plus the count of currently-active
+    acks/silences. Helps spot alerts that are habitually silenced rather than
+    acted on.
+    """
+    import time as _t
+    from datetime import datetime, timezone
+
+    ctx = _ctx(request)
+    entries = await ctx.audit.query(resource_type="burn_alert", limit=10_000)
+    cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600
+    counts = {"ack": 0, "silence": 0, "unack": 0, "unsilence": 0}
+    per_target: dict[str, dict[str, int]] = {}
+    for e in entries:
+        if e.at.timestamp() < cutoff:
+            continue
+        verb = e.action.replace("burn.", "")
+        if verb in counts:
+            counts[verb] += 1
+            t = per_target.setdefault(e.resource_id, {"ack": 0, "silence": 0})
+            if verb in t:
+                t[verb] += 1
+    acks = counts["ack"]
+    silences = counts["silence"]
+    denom = acks + silences
+    suppression_ratio = round(silences / denom, 3) if denom else 0.0
+    # Targets most often silenced (candidate noisy alerts).
+    noisy = sorted(
+        ({"target": k, **v} for k, v in per_target.items()),
+        key=lambda r: r["silence"], reverse=True,
+    )[:5]
+    active = await ctx.burn_acks.active_summary()
+    return {
+        "window_hours": hours,
+        "counts": counts,
+        "suppression_ratio": suppression_ratio,
+        "active_acks": len(active["acks"]),
+        "active_silences": len(active["silences"]),
+        "most_silenced": noisy,
+    }
 
 
 @router.get("/slo/burn-alerts", response_model=BurnAlertList, tags=["slo"])

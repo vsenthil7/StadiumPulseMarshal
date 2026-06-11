@@ -7,7 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.services.burn_ack_store import BurnAckStore
+from app.services.hash_burn_ack_store import HashBurnAckStore
+from app.services.kv_backend import MemoryKV
 
 PW = "MatchdayDemo123!"
 
@@ -17,15 +18,16 @@ def _login(c, email):
 
 
 # ── store unit ──────────────────────────────────────────────────────────────
-def test_store_ack_and_silence_expiry():
-    s = BurnAckStore()
-    s.acknowledge("SLO-X", "page", "alice", "looking")
-    assert s.ack_for("SLO-X", "page").acked_by == "alice"
-    # silence 0.001 min ≈ 0.06s then expires
-    s.silence("SLO-X", "page", minutes=0.001, by="alice")
-    assert s.is_silenced("SLO-X", "page") is True
+@pytest.mark.asyncio
+async def test_store_ack_and_silence_expiry():
+    s = HashBurnAckStore(MemoryKV())
+    await s.acknowledge("SLO-X", "page", "alice", "looking")
+    assert (await s.ack_for("SLO-X", "page")).acked_by == "alice"
+    # silence 0.001 min then expires
+    await s.silence("SLO-X", "page", minutes=0.001, by="alice")
+    assert await s.is_silenced("SLO-X", "page") is True
     time.sleep(0.1)
-    assert s.is_silenced("SLO-X", "page") is False
+    assert await s.is_silenced("SLO-X", "page") is False
 
 
 # ── endpoint RBAC + behaviour ───────────────────────────────────────────────
