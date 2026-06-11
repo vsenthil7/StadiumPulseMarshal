@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     # Optional shared backend for cross-instance rate-limiting (and future
     # shared counters). When set, auth limits are global across replicas.
     redis_url: str | None = None
+    # Security hardening toggles.
+    security_headers_enabled: bool = Field(default=True)
+    hsts_enabled: bool = Field(default=False)  # enable only behind TLS
+    csp_override: str | None = None
+    csrf_enabled: bool = Field(default=False)  # for cookie-auth deployments
+    cookie_secure: bool = Field(default=False)
 
     # --- Webhooks ---
     webhook_timeout_seconds: float = Field(default=5.0)

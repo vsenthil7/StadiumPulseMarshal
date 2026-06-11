@@ -124,3 +124,28 @@ def test_auth_events_endpoint_admin_only():
         # newest-first ordering
         ats = [e["at"] for e in events]
         assert ats == sorted(ats, reverse=True)
+
+
+def test_auth_events_filters_pagination_csv():
+    app = create_app()
+    with TestClient(app) as c:
+        app.state.ctx.auth_limiter.per_minute = 200
+        app.state.ctx.auth_limiter.reset()
+        for _ in range(3):
+            c.post("/api/v1/auth/login",
+                   json={"email": "admin@arena-north.demo", "password": PW})
+        c.post("/api/v1/auth/login", json={"email": "x@y.demo", "password": "bad"})
+        admin = c.post("/api/v1/auth/login",
+                       json={"email": "admin@arena-north.demo", "password": PW}).json()["token"]
+        h = {"Authorization": f"Bearer {admin}"}
+        # filter by outcome=failure
+        fail = c.get("/api/v1/auth/events?outcome=failure", headers=h).json()
+        assert fail["events"] and all(e["outcome"] == "failure" for e in fail["events"])
+        # pagination metadata present
+        page = c.get("/api/v1/auth/events?limit=2&offset=0", headers=h).json()
+        assert page["limit"] == 2 and "total" in page and len(page["events"]) <= 2
+        # CSV export
+        csv = c.get("/api/v1/auth/events?fmt=csv", headers=h)
+        assert csv.status_code == 200
+        assert "text/csv" in csv.headers["content-type"]
+        assert "timestamp,actor,action,outcome,ip" in csv.text

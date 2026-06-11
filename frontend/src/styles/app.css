@@ -642,3 +642,29 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .seg-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.08)); font-weight: 600; }
 .row-alert { background: rgba(196,49,75,.06); }
 .row-alert td:first-child { border-left: 2px solid var(--bad); }
+
+/* ---------- Per-venue dashboard ---------- */
+.venue-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px; margin-bottom: 16px; }
+.venue-card { border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; background: var(--surface); }
+.venue-card-head { display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; }
+.venue-card-head h4 { margin: 0; font-size: 15px; }
+.venue-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.vstat { display: flex; flex-direction: column; }
+.vstat-v { font-size: 18px; font-weight: 700; color: var(--ink); }
+.vstat-l { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+.venue-sev { display: flex; flex-wrap: wrap; gap: 6px; }
+.sev-chip { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--surface-2);
+  border: 1px solid var(--border); }
+.sev-chip.sev-critical { background: rgba(196,49,75,.10); border-color: rgba(196,49,75,.3); }
+.sev-chip.sev-high { background: rgba(214,128,32,.10); border-color: rgba(214,128,32,.3); }
+.venue-compare { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+.bar-value { font-size: 12px; color: var(--ink-2); min-width: 28px; text-align: right; }
+
+/* ---------- Pager + export ---------- */
+.pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; justify-content: flex-end; }
+.pager-info { font-size: 12px; color: var(--ink-2); }
+.seg:disabled { opacity: .4; cursor: default; }
+.export-btn { margin-left: auto; }

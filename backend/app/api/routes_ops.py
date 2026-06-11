@@ -14,6 +14,7 @@ from app.api.schemas_ext import (
     SLOListResponse,
 )
 from app.core.context import AppContext
+from app.services.analytics import VenueAnalyticsResponse
 from app.fixtures.scenarios.registry import all_scenarios
 
 router = APIRouter(prefix="/api/v1", tags=["ops"])
@@ -44,6 +45,22 @@ async def list_slo_budgets(
         budgets = [b for b in budgets
                    if (_venue_of(b) is None) or (_venue_of(b) in allowed)]
     return SLOListResponse(budgets=budgets)
+
+
+@router.get(
+    "/analytics/by-venue",
+    response_model=VenueAnalyticsResponse,
+    tags=["analytics"],
+)
+async def get_analytics_by_venue(
+    request: Request,
+    principal: Principal = Depends(require_permission(Permission.ANALYTICS_READ)),
+) -> VenueAnalyticsResponse:
+    ctx = _ctx(request)
+    venues = await ctx.analytics_by_venue(
+        principal_venues=None if principal.all_venues else principal.venues,
+    )
+    return VenueAnalyticsResponse(venues=venues)
 
 
 @router.get("/analytics", response_model=AnalyticsResponse, tags=["analytics"])

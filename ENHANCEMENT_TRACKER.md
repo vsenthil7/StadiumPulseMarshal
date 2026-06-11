@@ -506,3 +506,75 @@ Both tracks, full scope.
 - **N2:** docs + package.
 
 ### Round 10 — COMPLETE
+
+---
+
+## Round 11 — Compose+Redis e2e, security headers/CSRF, per-venue dashboards, +depth
+
+Broad round across infra, security, analytics and supporting modules. No descope.
+
+### Track O — Docker Compose: Redis + 2 app replicas + e2e
+| # | Sprint | Status |
+|---|--------|--------|
+| O1 | docker-compose.yml: redis + 2 app replicas + nginx LB (shared REDIS_URL) | 🟢 |
+| O2 | Verifier script: round-robin both replicas; assert shared rate-limit | 🟢 |
+| O3 | In-sandbox e2e proxy: 2 in-proc apps + 1 RRobinKV proving cross-instance | 🟢 |
+| O4 | Tests: shared limiter blocks across two independent app instances | 🟢 |
+
+### Track P — security headers + CSRF hardening
+| # | Sprint | Status |
+|---|--------|--------|
+| P1 | SecurityHeadersMiddleware (CSP, X-Frame-Options, nosniff, Referrer, HSTS) | 🟢 |
+| P2 | CSRF: double-submit cookie for cookie-auth'd state-changing requests | 🟢 |
+| P3 | Config toggles (csp, hsts, csrf) + safe defaults; exempt API-token calls | 🟢 |
+| P4 | Tests: headers present; CSRF rejects missing/mismatch; bearer exempt | 🟢 |
+
+### Track Q — per-venue analytics dashboards
+| # | Sprint | Status |
+|---|--------|--------|
+| Q1 | Backend: /analytics/by-venue (per-venue rollups, scoped) | 🟢 |
+| Q2 | AnalyticsSummary depth: mttr/mtta per venue, severity mix per venue | 🟢 |
+| Q3 | Frontend: venue dashboard cards + comparison; scope-aware | 🟢 |
+| Q4 | Tests: per-venue rollups correct + scoped; tsc/build | 🟢 |
+
+### Track R — supporting module depth
+| # | Sprint | Status |
+|---|--------|--------|
+| R1 | Backend: /auth/events pagination + action/outcome filters + CSV export | 🟢 |
+| R2 | SLO burn-rate alert windows surfaced; analytics SLO health per venue | 🟢 |
+| R3 | Frontend: Security page pagination + export button; SLO health on dashboard | 🟢 |
+| R4 | Tests for new endpoints + UI typecheck | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| S1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| S2 | Docs + package | 🟢 |
+
+### Round 11 changelog
+- **Track O — Compose + Redis + 2 replicas:** docker-compose.yml (redis + app1 +
+  app2 + nginx LB on :8088), nginx round-robin config preserving real client IP,
+  and verify_multi_instance.sh asserting the shared limit holds across replicas.
+  Docker can't run in-sandbox, so an in-sandbox PROOF (3 tests) shows two app
+  instances sharing one KV enforce a single global cap (5, not 10) while
+  independent KVs allow 10 — exactly the Redis-vs-in-process distinction.
+- **Track P — security headers + CSRF:** SecurityHeadersMiddleware (CSP,
+  X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy, optional
+  HSTS) on every response; CSRFMiddleware double-submit cookie for cookie-auth
+  state changes, exempting Bearer/API-key (token-auth isn't CSRF-able). Config
+  toggles + safe defaults. +5 tests. Live-verified headers present.
+- **Track Q — per-venue dashboards:** VenueAnalytics model + compute_by_venue,
+  analytics_by_venue context method, GET /analytics/by-venue (scoped). Frontend
+  VenueDashboard (per-venue cards: incidents/open/MTTR/MTTA, severity mix, SLO
+  health %, cross-venue comparison bar) on the Reliability page. +1 test.
+  Live-verified (Arena 50% SLO health vs Olympic 100%).
+- **Track R — module depth:** /auth/events gained action/outcome filters,
+  offset/limit pagination, and fmt=csv export; Security page upgraded with
+  server pagination (prev/next), filter reset, and an Export CSV button; venue
+  SLO health surfaced on the dashboard cards. +1 test. Live-verified CSV
+  download header.
+- **S1:** backend **314 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **S2:** docs + package.
+
+### Round 11 — COMPLETE

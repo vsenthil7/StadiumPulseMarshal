@@ -178,6 +178,43 @@ class AppContext:
             budgets = [b for b in budgets if _bv(b) is None or _bv(b) in allowed]
         return compute_summary(incidents, budgets)
 
+    async def analytics_by_venue(
+        self, principal_venues: list[str] | None = None,
+    ) -> list:
+        """Per-venue rollups, scoped to the principal's venues (None = all).
+
+        Determines the set of venues to report, maps each SLO budget to its
+        owning venue via the entity resolver, and computes per-venue metrics.
+        """
+        from app.services.analytics import compute_by_venue
+
+        await self.ensure_entity_venue_map()
+        incidents = await self.repos.incidents.list(limit=1000)
+        budgets = await self.repos.slo.list_budgets()
+        if not budgets:
+            budgets = await self.evaluate_slos()
+
+        slo_entity = {s.id: s.service_id for s in self.slo_engine.slos}
+        budgets_by_venue: dict[str, list] = {}
+        for b in budgets:
+            v = self.entity_venue.venue_for(slo_entity.get(b.slo_id))
+            if v:
+                budgets_by_venue.setdefault(v, []).append(b)
+
+        # Venue universe: those appearing on incidents or SLOs (plus known
+        # demo venues), then intersected with the principal's scope.
+        seen = {i.venue_id for i in incidents if i.venue_id}
+        seen |= set(budgets_by_venue.keys())
+        if principal_venues is not None:
+            seen &= set(principal_venues)
+        venues = sorted(seen)
+        if principal_venues is not None:
+            incidents = [
+                i for i in incidents
+                if i.venue_id is None or i.venue_id in set(principal_venues)
+            ]
+        return compute_by_venue(incidents, budgets_by_venue, venues)
+
     async def startup(self) -> None:
         from app.core.config import ConfigurationError
 

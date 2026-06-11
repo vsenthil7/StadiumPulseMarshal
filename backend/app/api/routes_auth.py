@@ -290,34 +290,67 @@ async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
 async def auth_events(
     request: Request,
     limit: int = 100,
+    offset: int = 0,
+    action: str | None = None,
+    outcome: str | None = None,
+    fmt: str | None = None,
     _p: Principal = Depends(require_permission(Permission.SETTINGS_WRITE)),
-) -> dict:
+):
     """Admin-only: the authentication audit trail (login/refresh/reuse/logout).
 
-    Reads auth-typed entries from the audit log, newest first, for the console's
+    Reads auth-typed entries from the audit log, newest first. Supports
+    ``action``/``outcome`` filters, ``offset``/``limit`` pagination, and
+    ``fmt=csv`` to download the (filtered) trail as CSV for the console's
     Security page.
     """
     entries = await request.app.state.ctx.audit.query(
-        resource_type="auth", limit=limit
+        resource_type="auth", limit=10_000
     )
     entries = sorted(entries, key=lambda e: e.at, reverse=True)
-    return {
-        "events": [
-            {
-                "id": e.id,
-                "at": e.at.isoformat(),
-                "actor": e.actor,
-                "action": e.action,
-                "outcome": e.metadata.get("outcome", ""),
-                "ip": e.metadata.get("ip", ""),
-                "detail": {
-                    k: v for k, v in e.metadata.items()
-                    if k not in ("outcome", "ip")
-                },
-            }
-            for e in entries
-        ]
-    }
+    if action:
+        entries = [e for e in entries if e.action == action]
+    if outcome:
+        entries = [e for e in entries if e.metadata.get("outcome") == outcome]
+    total = len(entries)
+    page = entries[offset:offset + limit]
+
+    rows = [
+        {
+            "id": e.id,
+            "at": e.at.isoformat(),
+            "actor": e.actor,
+            "action": e.action,
+            "outcome": e.metadata.get("outcome", ""),
+            "ip": e.metadata.get("ip", ""),
+            "detail": {
+                k: v for k, v in e.metadata.items()
+                if k not in ("outcome", "ip")
+            },
+        }
+        for e in page
+    ]
+
+    if fmt == "csv":
+        import csv
+        import io
+
+        from fastapi.responses import StreamingResponse
+
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["timestamp", "actor", "action", "outcome", "ip"])
+        for r in rows:
+            w.writerow([r["at"], r["actor"], r["action"], r["outcome"], r["ip"]])
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=auth-events.csv"
+            },
+        )
+
+    return {"events": rows, "total": total, "offset": offset, "limit": limit}
 
 
 @router.get("/demo-users")

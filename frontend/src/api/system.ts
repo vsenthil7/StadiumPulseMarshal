@@ -14,11 +14,19 @@ export const systemApi = {
       '/venues',
     ),
   oidcStatus: () => http<{ enabled: boolean }>('/auth/oidc/status'),
-  authEvents: () =>
-    http<{
+  authEvents: (params?: { limit?: number; offset?: number; outcome?: string; action?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set('limit', String(params.limit));
+    if (params?.offset != null) q.set('offset', String(params.offset));
+    if (params?.outcome) q.set('outcome', params.outcome);
+    if (params?.action) q.set('action', params.action);
+    const qs = q.toString();
+    return http<{
       events: {
         id: string; at: string; actor: string; action: string;
         outcome: string; ip: string; detail: Record<string, unknown>;
       }[];
-    }>('/auth/events'),
+      total: number; offset: number; limit: number;
+    }>(`/auth/events${qs ? `?${qs}` : ''}`);
+  },
 };

@@ -3,6 +3,7 @@ import { apiExt, apiP3 } from '../api/client';
 import type { AnalyticsSummary, ErrorBudget, SLOTrend } from '../types';
 import { SLODashboard } from '../components/SLODashboard';
 import { AnalyticsPanel } from '../components/AnalyticsPanel';
+import { VenueDashboard } from '../components/VenueDashboard';
 import { SLOTrends } from '../components/SLOTrends';
 
 export function ReliabilityPage() {
@@ -59,6 +60,14 @@ export function ReliabilityPage() {
         </header>
         <div className="body">
           {summary && <AnalyticsPanel summary={summary} />}
+        </div>
+      </div>
+      <div className="panel">
+        <header>
+          <h3>Per-venue dashboards</h3>
+        </header>
+        <div className="body">
+          <VenueDashboard />
         </div>
       </div>
     </div>

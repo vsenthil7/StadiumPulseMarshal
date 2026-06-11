@@ -1,0 +1,55 @@
+# Multi-instance deployment: Redis-backed shared state + two app replicas behind
+# an nginx load balancer. Proves the Round 10 shared backends end-to-end —
+# the auth rate limiter and any shared counters are global across replicas
+# because both replicas point at the same REDIS_URL.
+#
+#   docker compose up --build
+#   ./scripts/verify_multi_instance.sh   # asserts the shared limit holds across both
+#
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  app1:
+    build:
+      context: .
+    environment:
+      - USE_MOCKS=true
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_RATE_LIMIT_PER_MINUTE=5
+      - SECURITY_HEADERS_ENABLED=true
+      - INSTANCE_ID=app1
+      - PORT=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  app2:
+    build:
+      context: .
+    environment:
+      - USE_MOCKS=true
+      - REDIS_URL=redis://redis:6379/0
+      - AUTH_RATE_LIMIT_PER_MINUTE=5
+      - SECURITY_HEADERS_ENABLED=true
+      - INSTANCE_ID=app2
+      - PORT=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  lb:
+    image: nginx:1.27-alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./scripts/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1
+      - app2

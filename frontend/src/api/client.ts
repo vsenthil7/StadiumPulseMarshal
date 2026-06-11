@@ -72,6 +72,7 @@ import type {
   NotificationItem,
   Page,
   ScenarioInfo,
+  VenueAnalytics,
 } from '../types';
 
 export const apiExt = {
@@ -112,6 +113,8 @@ export const apiExt = {
   getSLO: () => http<{ budgets: ErrorBudget[] }>('/slo').then((r) => r.budgets),
   getAnalytics: () =>
     http<{ summary: AnalyticsSummary }>('/analytics').then((r) => r.summary),
+  getAnalyticsByVenue: () =>
+    http<{ venues: VenueAnalytics[] }>('/analytics/by-venue').then((r) => r.venues),
   getNotifications: () =>
     http<{ notifications: NotificationItem[] }>('/notifications').then(
       (r) => r.notifications,

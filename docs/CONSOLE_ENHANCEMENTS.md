@@ -404,3 +404,40 @@ live: viewers are 403, admins see login successes and failures.
 ### Tests
 Backend **304 pass** (+7 this round: KV + shared limiter, /auth/events).
 Frontend `tsc -b` + `vite build` green; 7 node RBAC unit tests pass.
+
+---
+
+## Round 11 — Multi-instance compose, security hardening, per-venue dashboards
+
+### Compose: Redis + two replicas (multi-instance, verified)
+`docker-compose.yml` runs Redis, two app replicas and an nginx round-robin load
+balancer (`:8088`); `scripts/verify_multi_instance.sh` hammers `/auth/login` and
+asserts the shared rate limit produces a 429 within 6 attempts *even though
+requests alternate across replicas* — only possible because both replicas share
+one Redis window counter. Docker isn't available in the build sandbox, so the
+property the stack depends on is proven directly by tests: two independent app
+instances sharing one KV enforce a single global cap (5), while independent KVs
+allow double (10).
+
+### Security headers + CSRF
+Every response now carries a hardened header set — Content-Security-Policy
+(same-origin, `frame-ancestors 'none'`), `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and
+optional HSTS (enable behind TLS). A double-submit-cookie CSRF guard is available
+for cookie-authenticated deployments; it exempts `Authorization`/`X-API-Key`
+requests since token auth cannot be CSRF'd. All toggle via config.
+
+### Per-venue analytics dashboards
+`GET /analytics/by-venue` returns scoped per-venue rollups — incidents (total /
+open / resolved), MTTR/MTTA, severity mix, and SLO health (% of a venue's SLOs
+not breaching). The Reliability page renders a card per venue plus a cross-venue
+incident-volume comparison; a venue-scoped operator sees only their own venue.
+
+### Module depth
+The auth audit endpoint gained `action`/`outcome` filters, `offset`/`limit`
+pagination and `fmt=csv` export; the Security page got server-side pagination
+(prev/next), a filter reset, and an Export CSV button.
+
+### Tests
+Backend **314 pass** (+10 this round). Frontend `tsc -b` + `vite build` green;
+7 node RBAC unit tests pass.

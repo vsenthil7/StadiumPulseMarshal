@@ -171,6 +171,19 @@ export interface AnalyticsSummary {
   slo_total: number;
 }
 
+export interface VenueAnalytics {
+  venue_id: string;
+  total_incidents: number;
+  open_incidents: number;
+  resolved_incidents: number;
+  mttr_minutes: number | null;
+  mtta_minutes: number | null;
+  by_severity: Record<string, number>;
+  slo_total: number;
+  slo_breaching: number;
+  slo_health: number;
+}
+
 export interface NotificationItem {
   id: string;
   incident_id: string;

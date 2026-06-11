@@ -62,6 +62,20 @@ def create_app() -> FastAPI:
 
         app.add_middleware(RateLimitMiddleware)
 
+    if settings.csrf_enabled:
+        from app.middleware.csrf import CSRFMiddleware
+
+        app.add_middleware(CSRFMiddleware, cookie_secure=settings.cookie_secure)
+
+    if settings.security_headers_enabled:
+        from app.middleware.security_headers import SecurityHeadersMiddleware
+
+        app.add_middleware(
+            SecurityHeadersMiddleware,
+            csp=settings.csp_override,
+            hsts=settings.hsts_enabled,
+        )
+
     register_exception_handlers(app)
 
     app.include_router(router)

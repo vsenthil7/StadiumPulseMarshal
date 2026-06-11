@@ -286,3 +286,29 @@ def test_analytics_scoped_incidents_by_venue():
         an = c.get("/api/v1/analytics",
                    headers={"Authorization": f"Bearer {op}"}).json()["summary"]
         assert set(an["by_venue"].keys()) <= {"venue_arena_north"}
+
+
+# ── Round 11 Track Q: per-venue analytics rollups ───────────────────────────
+def test_analytics_by_venue_rollup_and_scope():
+    with _client() as c:
+        sre = _login(c, "sre@stadiumpulse.demo")["token"]
+        hs = {"Authorization": f"Bearer {sre}"}
+        # create incidents in both venues
+        for vid in ("venue_arena_north", "venue_olympic_park"):
+            probs = c.get(f"/api/v1/problems?venue_id={vid}", headers=hs).json()["problems"]
+            if probs:
+                c.post("/api/v1/incidents",
+                       json={"problem_id": probs[0]["id"], "venue_id": vid}, headers=hs)
+        # platform sees per-venue rows for both venues
+        rows = c.get("/api/v1/analytics/by-venue", headers=hs).json()["venues"]
+        vids = {r["venue_id"] for r in rows}
+        assert "venue_arena_north" in vids
+        # each row carries rollup fields
+        for r in rows:
+            assert "mttr_minutes" in r and "slo_health" in r and "by_severity" in r
+
+        # arena operator only sees its own venue row
+        op = _login(c, "operator@arena-north.demo")["token"]
+        orows = c.get("/api/v1/analytics/by-venue",
+                      headers={"Authorization": f"Bearer {op}"}).json()["venues"]
+        assert {r["venue_id"] for r in orows} <= {"venue_arena_north"}
