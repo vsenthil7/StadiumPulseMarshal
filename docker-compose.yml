@@ -16,6 +16,21 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["pg"]
+    environment:
+      - POSTGRES_USER=spm
+      - POSTGRES_PASSWORD=spm
+      - POSTGRES_DB=spm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spm"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - spm-pg:/var/lib/postgresql/data
+
   app1:
     build:
       context: .
@@ -65,3 +80,4 @@ services:
 # multi-writer concurrency use Postgres (set DATABASE_URL accordingly).
 volumes:
   spm-data:
+  spm-pg:

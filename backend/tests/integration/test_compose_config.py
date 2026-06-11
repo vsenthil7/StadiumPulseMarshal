@@ -62,3 +62,11 @@ def test_compose_declares_data_volume():
     yaml = pytest.importorskip("yaml")
     cfg = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
     assert "spm-data" in (cfg.get("volumes") or {})
+
+
+def test_compose_has_postgres_profile():
+    yaml = pytest.importorskip("yaml")
+    cfg = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    pg = cfg["services"].get("postgres")
+    assert pg is not None and "pg" in pg.get("profiles", [])
+    assert "spm-pg" in (cfg.get("volumes") or {})

@@ -710,3 +710,32 @@ SQLite ack DB (use Postgres for true multi-writer concurrency).
 
 ### Tests
 Backend **404 pass** (+13 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 21 — Digest dispatch, Postgres profile, configurable digest, net-active, venue chart
+
+### Digest to a real channel
+The digest scheduler now dispatches via the notification service onto a
+configurable channel (`BURN_DIGEST_CHANNEL` / `BURN_DIGEST_RECIPIENT`), and
+`GET /slo/burn-digest?dispatch=true` sends it on demand (responder+).
+
+### Postgres compose profile
+`docker compose --profile pg up` brings up Postgres for true multi-writer
+durability; point `DATABASE_URL` at it. A concurrent-writer test exercises the
+SQL ack store under `asyncio.gather`.
+
+### Configurable digest
+`compose_digest` takes a window and minimum severity; the endpoint and scheduler
+honor `BURN_DIGEST_WINDOW_HOURS` / `BURN_DIGEST_MIN_SEVERITY`.
+
+### Net-active trend overlay
+Trend buckets carry a cumulative `net_active` (silence − unsilence); the chart
+overlays it as a dashed line, with the count in the hover tooltip.
+
+### Burn-by-venue chart
+The On-call page shows page/ticket burn as grouped bars per venue, above the
+existing table.
+
+### Tests
+Backend **409 pass** (+5 this round). Frontend `tsc -b` + `vite build` green.

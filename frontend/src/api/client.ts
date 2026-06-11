@@ -169,7 +169,7 @@ export const apiExt = {
     if (venueId) q.set('venue_id', venueId);
     return http<{
       window_hours: number; bucket_width_seconds: number; venue_id: string | null;
-      buckets: { index: number; ack: number; silence: number; unack: number; unsilence: number; start_epoch: number }[];
+      buckets: { index: number; ack: number; silence: number; unack: number; unsilence: number; net_active?: number; start_epoch: number }[];
     }>(`/slo/burn-trend?${q.toString()}`);
   },
   getBurnByVenue: () =>

@@ -88,3 +88,18 @@ def test_full_app_with_database_acks_through_api(monkeypatch, tmp_path):
             assert again["acked_count"] >= 1
     finally:
         cfg.get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_writers_distinct_keys():
+    """Many concurrent upserts to distinct (slo,severity) rows all persist
+    (SQLite serializes writes; the store must not lose rows under gather)."""
+    import asyncio
+    db = await _db()
+    s = SqlBurnAckStore(db)
+    await asyncio.gather(*[
+        s.acknowledge(f"SLO-{i}", "page", f"user{i}") for i in range(15)
+    ])
+    summ = await s.active_summary()
+    assert len(summ["acks"]) == 15
+    await db.dispose()

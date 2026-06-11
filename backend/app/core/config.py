@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     # Burn/suppression digest (periodic summary). Disabled by default.
     burn_digest_enabled: bool = Field(default=False)
     burn_digest_interval_seconds: float = Field(default=3600.0)
+    burn_digest_channel: str = Field(default="slack")
+    burn_digest_recipient: str = Field(default="#slo-alerts")
+    burn_digest_window_hours: float = Field(default=24.0)
+    burn_digest_min_severity: str = Field(default="ticket")
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

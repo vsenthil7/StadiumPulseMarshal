@@ -80,6 +80,18 @@ class NotificationService:
         )
         return notification
 
+    async def notify_digest(self, message: str, channel=None,
+                            recipient: str = "#slo-alerts") -> Notification:
+        """Dispatch a burn/suppression digest as a notification on a channel."""
+        ch = channel or NotificationChannel.SLACK
+        n = Notification(
+            id=_new_id(), incident_id=None,
+            source=NotificationSource.BURN_ALERT, severity="digest",
+            channel=ch, recipient=recipient,
+            subject="StadiumPulse burn digest", body=message,
+        )
+        return await self._dispatch(n)
+
     async def list_for_incident(self, incident_id: str) -> list[Notification]:
         return await self._repo.list(incident_id=incident_id)
 

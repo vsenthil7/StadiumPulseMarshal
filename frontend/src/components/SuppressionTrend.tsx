@@ -7,6 +7,7 @@ interface Bucket {
   index: number;
   ack: number;
   silence: number;
+  net_active?: number;
   start_epoch: number;
 }
 
@@ -55,6 +56,27 @@ export function SuppressionTrend({ buckets }: { buckets: Bucket[] }) {
             </g>
           );
         })}
+        {(() => {
+          const maxNet = Math.max(1, ...buckets.map((b) => b.net_active ?? 0));
+          if (maxNet <= 0) return null;
+          const pts = buckets
+            .map((b, i) => {
+              const cx = i * (bw + gap) + bw / 2;
+              const cy = H - ((b.net_active ?? 0) / maxNet) * (H - 6) - 2;
+              return `${cx.toFixed(1)},${cy.toFixed(1)}`;
+            })
+            .join(' ');
+          return (
+            <polyline
+              points={pts}
+              fill="none"
+              stroke="var(--ink-2, #888)"
+              strokeWidth="1.5"
+              strokeDasharray="3 2"
+              opacity="0.8"
+            />
+          );
+        })()}
       </svg>
       <div className="trend-axis">
         <span>{hhmm(buckets[0].start_epoch)}</span>
@@ -64,6 +86,7 @@ export function SuppressionTrend({ buckets }: { buckets: Bucket[] }) {
       {hb && (
         <div className="trend-tooltip" data-testid="trend-tooltip">
           {hhmm(hb.start_epoch)} · {hb.ack} ack / {hb.silence} silence
+          {hb.net_active != null ? ` · ${hb.net_active} active` : ''}
         </div>
       )}
     </div>

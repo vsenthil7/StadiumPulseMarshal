@@ -711,3 +711,5 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .trend-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-2); margin-top: 2px; }
 .trend-tooltip { font-size: 12px; color: var(--ink); margin-top: 4px; padding: 2px 8px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; display: inline-block; }
+.venue-burn-chart, .venue-burn-label { fill: var(--ink); }
+.venue-burn-chart { display: block; margin-bottom: 10px; }

@@ -1067,3 +1067,66 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **BP2:** docs + package.
 
 ### Round 20 — COMPLETE
+
+---
+
+## Round 21 — Digest→channel, Postgres profile, configurable digest, net-active overlay, venue chart
+
+### Track BQ — digest dispatch to a real notification channel
+| # | Sprint | Status |
+|---|--------|--------|
+| BQ1 | DigestScheduler dispatch creates a Notification (configurable channel) | 🟢 |
+| BQ2 | Config: BURN_DIGEST_CHANNEL + recipient; default slack | 🟢 |
+| BQ3 | /slo/burn-digest?dispatch=true sends now (responder+) | 🟢 |
+| BQ4 | Tests: dispatch creates a digest notification; channel honored | 🟢 |
+
+### Track BR — Postgres compose profile + concurrency note/test
+| # | Sprint | Status |
+|---|--------|--------|
+| BR1 | docker-compose: postgres service + profile; DATABASE_URL override | 🟢 |
+| BR2 | SqlBurnAckStore concurrent-writer test (asyncio.gather upserts) | 🟢 |
+| BR3 | Config-validation test for the pg profile | 🟢 |
+
+### Track BS — configurable digest (window + min severity)
+| # | Sprint | Status |
+|---|--------|--------|
+| BS1 | compose_digest(window_hours, min_severity) | 🟢 |
+| BS2 | /slo/burn-digest accepts params; scheduler uses config | 🟢 |
+| BS3 | Tests: severity filter, window | 🟢 |
+
+### Track BT — net-active trend overlay
+| # | Sprint | Status |
+|---|--------|--------|
+| BT1 | burn-trend buckets include net_active (silence-unsilence cumulative) | 🟢 |
+| BT2 | SuppressionTrend overlays net-active line | 🟢 |
+| BT3 | Tests: cumulative net computed; tsc/build | 🟢 |
+
+### Track BU — burn-by-venue chart
+| # | Sprint | Status |
+|---|--------|--------|
+| BU1 | Frontend: grouped bar chart (page/ticket per venue) SVG | 🟢 |
+| BU2 | On-call page renders chart + keeps table | 🟢 |
+| BU3 | tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| BV1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| BV2 | Docs + package | 🟢 |
+
+### Round 21 changelog
+- **BQ — digest→channel:** notify_digest creates a Notification on a configurable
+  channel; DigestScheduler dispatches via it; /slo/burn-digest?dispatch=true sends
+  now (responder+). +tests. Live-verified (slack #slo-alerts).
+- **BR — Postgres profile:** compose postgres service under profile "pg" + spm-pg
+  volume; SqlBurnAckStore concurrent-writer test (15-way gather); pg config test.
+- **BS — configurable digest:** compose_digest(window_hours, min_severity); endpoint
+  + scheduler honor config (BURN_DIGEST_WINDOW_HOURS/MIN_SEVERITY). +tests.
+- **BT — net-active overlay:** burn-trend buckets carry cumulative net_active;
+  SuppressionTrend overlays a dashed net-active line + tooltip. Live-verified.
+- **BU — burn-by-venue chart:** grouped page/ticket SVG bars on the On-call page
+  above the table.
+- **BV1:** backend **409 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **BV2:** docs + package.
+
+### Round 21 — COMPLETE

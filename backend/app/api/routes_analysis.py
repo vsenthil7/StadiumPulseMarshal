@@ -1,7 +1,7 @@
 """Routes for SLO trends, postmortems, incident search and bulk operations."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.api.auth import require_permission, require_venue_access, scope_collection
@@ -88,14 +88,32 @@ async def slo_burn_events(
 
 @router.get("/slo/burn-digest", tags=["slo"])
 async def slo_burn_digest(
-    request: Request,
-    _p: Principal = Depends(require_permission(Permission.SLO_READ)),
+    request: Request, hours: float = 24.0, min_severity: str = "ticket",
+    dispatch: bool = False,
+    principal: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> dict:
-    """Preview the burn/suppression digest message (as the scheduler would send)."""
+    """Preview (or dispatch) the burn/suppression digest.
+
+    ``dispatch=true`` sends it on the configured channel (responder+ required).
+    """
     from app.services.digest_service import compose_digest
 
     ctx = _ctx(request)
-    return {"digest": await compose_digest(ctx)}
+    msg = await compose_digest(ctx, hours, min_severity)
+    sent = False
+    if dispatch:
+        if not principal.has(Permission.REMEDIATION_APPROVE):
+            raise HTTPException(status_code=403, detail="dispatch requires responder")
+        from app.models.notification import NotificationChannel
+
+        ch_name = ctx.settings.burn_digest_channel
+        ch = NotificationChannel(ch_name) \
+            if ch_name in {c.value for c in NotificationChannel} \
+            else NotificationChannel.SLACK
+        await ctx.notifications.notify_digest(
+            msg, channel=ch, recipient=ctx.settings.burn_digest_recipient)
+        sent = True
+    return {"digest": msg, "dispatched": sent}
 
 
 @router.get("/slo/burn-by-venue", tags=["slo"])
@@ -199,7 +217,17 @@ async def slo_burn_trend(
                 series[_bucket_index(ts)][verb] += 1
 
     return {"window_hours": hours, "bucket_width_seconds": round(width, 1),
-            "venue_id": venue_id, "buckets": series}
+            "venue_id": venue_id, "buckets": _with_net_active(series)}
+
+
+def _with_net_active(series: list[dict]) -> list[dict]:
+    """Annotate each bucket with a running net-active silence count
+    (cumulative silence − unsilence up to and including that bucket)."""
+    running = 0
+    for b in series:
+        running += b.get("silence", 0) - b.get("unsilence", 0)
+        b["net_active"] = max(0, running)
+    return series
 
 
 @router.get("/slo/burn-stats", tags=["slo"])

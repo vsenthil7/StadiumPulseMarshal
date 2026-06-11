@@ -96,3 +96,47 @@ async def test_digest_scheduler_idempotent_start_stop():
 
 async def _noop():
     return None
+
+
+def test_digest_dispatch_creates_notification():
+    with TestClient(create_app()) as c:
+        tok = c.post("/api/v1/auth/login",
+                     json={"email": "responder@arena-north.demo", "password": PW}).json()["token"]
+        h = {"Authorization": f"Bearer {tok}"}
+        r = c.get("/api/v1/slo/burn-digest?dispatch=true", headers=h)
+        assert r.status_code == 200 and r.json()["dispatched"] is True
+        # a digest-sourced notification now exists
+        ns = c.get("/api/v1/notifications?severity=digest", headers=h).json()["notifications"]
+        assert ns and ns[0]["subject"].lower().startswith("stadiumpulse burn digest")
+
+
+def test_digest_dispatch_requires_responder():
+    with TestClient(create_app()) as c:
+        v = c.post("/api/v1/auth/login",
+                   json={"email": "viewer@arena-north.demo", "password": PW}).json()["token"]
+        r = c.get("/api/v1/slo/burn-digest?dispatch=true",
+                  headers={"Authorization": f"Bearer {v}"})
+        assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_compose_digest_severity_filter():
+    from app.services.digest_service import compose_digest
+
+    class _Alert:
+        def __init__(self, sev, rate):
+            self.severity = sev; self.burn_rate = rate
+            self.slo_name = "X"; self.slo_id = "S"
+    class _Ctx:
+        async def burn_alerts(self):
+            return [_Alert("ticket", 2.0), _Alert("page", 15.0)]
+        class _A:
+            async def active_summary(self): return {"acks": [], "silences": []}
+        burn_acks = _A()
+        class _C:
+            async def totals(self): return {"ack": 0, "silence": 0}
+        burn_counters = _C()
+    # min_severity=page → only the page alert counts
+    msg = await compose_digest(_Ctx(), window_hours=12, min_severity="page")
+    assert "1 page, 0 ticket" in msg
+    assert "Window: 12h, min severity: page" in msg

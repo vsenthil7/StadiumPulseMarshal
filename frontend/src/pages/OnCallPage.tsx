@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiExt } from '../api/client';
 import { SuppressionTrend } from '../components/SuppressionTrend';
+import { BurnByVenueChart } from '../components/BurnByVenueChart';
 
 interface OnCallData {
   roster: { id: string; name: string; tier: string; handle: string; channels: string[] }[];
@@ -202,6 +203,7 @@ export function OnCallPage() {
         <div className="panel">
           <header><h3>Burn by venue</h3></header>
           <div className="body">
+            <BurnByVenueChart venues={byVenue} />
             <table className="data-table">
               <thead>
                 <tr><th>Venue</th><th>Page</th><th>Ticket</th><th>Acked</th><th>Silenced</th></tr>

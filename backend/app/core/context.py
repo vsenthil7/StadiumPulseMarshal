@@ -386,9 +386,21 @@ class AppContext:
         self.prune_scheduler.start()
         if self.settings.burn_digest_enabled:
             from app.services.digest_service import DigestScheduler
+            from app.models.notification import NotificationChannel
+
+            ch = NotificationChannel(self.settings.burn_digest_channel) \
+                if self.settings.burn_digest_channel in {c.value for c in NotificationChannel} \
+                else NotificationChannel.SLACK
+
+            async def _dispatch_digest(msg: str) -> None:
+                await self.notifications.notify_digest(
+                    msg, channel=ch, recipient=self.settings.burn_digest_recipient)
 
             self.digest_scheduler = DigestScheduler(
                 self, self.settings.burn_digest_interval_seconds,
+                dispatch=_dispatch_digest,
+                window_hours=self.settings.burn_digest_window_hours,
+                min_severity=self.settings.burn_digest_min_severity,
             )
             self.digest_scheduler.start()
 
