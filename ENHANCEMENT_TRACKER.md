@@ -1385,3 +1385,36 @@ Implemented the genuinely-missing operational deliverables from the V02 playbook
 Backend **450 pass** (+10); frontend tsc -b + vite build green; 7 node RBAC tests.
 
 ### Round 26 — COMPLETE (P5.S2, P5.S3, P1.S1, P1.S2)
+
+---
+
+## Round 27 — Playbook V02 P6 width modules (batch 1)
+
+Worked straight through the playbook flow (no pauses), adding five enterprise
+width modules end-to-end (model → service → RBAC routes → tests), each wired into
+AppContext + main router registration:
+
+- **P6.M1 — Runbook library** (`models/runbook.py`, `services/runbook_service.py`,
+  `api/routes_runbooks.py`): versioned/tagged procedures, CRUD, execute (dispatches
+  automation steps via RemediationDispatcher), execution history. New perms
+  RUNBOOK_READ/WRITE. **+9 tests**.
+- **P6.M3 — Postmortem workflow** (`models/postmortem.py`,
+  `services/postmortem_service.py`, `api/routes_postmortems.py`): blameless review
+  with timeline, action items, publish, Markdown export. New perms
+  POSTMORTEM_READ/WRITE. **+6 tests**.
+- **P6.M7 — Cost/capacity analytics** (`models/cost_analytics.py`,
+  `services/cost_analytics_service.py`): per-service spend + utilisation +
+  right-sizing flags. **+2 tests**.
+- **P6.M9 — Change-event correlation** (`models/change_event.py`,
+  `services/change_event_service.py`): record changes, link to incidents,
+  time-proximity correlation. **+3 tests** (incl. correlate ISO-`+` fix).
+- **P6.M5 — Fleet command center** (`/api/v1/fleet`): per-venue operational rollup
+  reusing analytics-by-venue; added EntityVenueResolver.known_venues(). **+1 test**.
+
+All five modules are RBAC-guarded; enterprise routes live in
+`api/routes_enterprise.py`. Backend **471 pass** (+21); frontend tsc+build green;
+7 node RBAC tests pass.
+
+### Round 27 — COMPLETE (P6.M1, M3, M5, M7, M9)
+### Still queued (continuing next): P2 Alembic, P4 Cloud Run/Dockerfile/deploy.sh,
+### P6.M2 escalation, P6.M6 ChatOps, P6.M8 Davis feedback, P5.S5 k6 load, frontend pages.

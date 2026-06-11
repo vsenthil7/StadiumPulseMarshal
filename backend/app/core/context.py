@@ -40,6 +40,17 @@ class AppContext:
         self.alert_router = build_alert_router(self.settings)
         self.remediation_dispatcher = build_remediation_dispatcher(self.settings)
         self.notifications.set_alert_router(self.alert_router)
+        from app.services.runbook_service import RunbookService
+
+        self.runbooks = RunbookService(dispatcher=self.remediation_dispatcher)
+        from app.services.postmortem_service import PostmortemService
+
+        self.postmortems = PostmortemService()
+        from app.services.cost_analytics_service import CostAnalyticsService
+        from app.services.change_event_service import ChangeEventService
+
+        self.cost_analytics = CostAnalyticsService()
+        self.change_events = ChangeEventService()
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )

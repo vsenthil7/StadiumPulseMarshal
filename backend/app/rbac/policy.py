@@ -21,6 +21,10 @@ class Permission(str, Enum):
     SCENARIO_WRITE = "scenario:write"
     WEBHOOK_ADMIN = "webhook:admin"
     SETTINGS_WRITE = "settings:write"
+    RUNBOOK_READ = "runbook:read"
+    RUNBOOK_WRITE = "runbook:write"
+    POSTMORTEM_READ = "postmortem:read"
+    POSTMORTEM_WRITE = "postmortem:write"
 
 
 class Role(str, Enum):
@@ -37,6 +41,8 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
         Permission.REMEDIATION_READ,
         Permission.SLO_READ,
         Permission.ANALYTICS_READ,
+        Permission.RUNBOOK_READ,
+        Permission.POSTMORTEM_READ,
     },
     Role.OPERATOR: {
         Permission.INCIDENT_READ,
@@ -45,6 +51,9 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
         Permission.SLO_READ,
         Permission.ANALYTICS_READ,
         Permission.SCENARIO_WRITE,
+        Permission.RUNBOOK_READ,
+        Permission.POSTMORTEM_READ,
+        Permission.POSTMORTEM_WRITE,
     },
     Role.RESPONDER: {
         Permission.INCIDENT_READ,
@@ -54,6 +63,10 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
         Permission.SLO_READ,
         Permission.ANALYTICS_READ,
         Permission.SCENARIO_WRITE,
+        Permission.RUNBOOK_READ,
+        Permission.RUNBOOK_WRITE,
+        Permission.POSTMORTEM_READ,
+        Permission.POSTMORTEM_WRITE,
     },
     Role.ADMIN: set(Permission),  # all permissions
 }

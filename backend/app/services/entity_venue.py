@@ -60,6 +60,10 @@ class EntityVenueResolver:
             return None
         return self._map.get(entity_id)
 
+    def known_venues(self) -> list[str]:
+        """Distinct venue ids currently mapped (for fleet rollups)."""
+        return sorted({v for v in self._map.values() if v})
+
     def venue_for_any(self, entity_ids: list[str]) -> str | None:
         """First resolvable venue among the given entity ids (for SLOs/records
         that reference one or more entities)."""
