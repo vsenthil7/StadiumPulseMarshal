@@ -8,6 +8,7 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { HealthPage } from './pages/HealthPage';
 import { SecurityPage } from './pages/SecurityPage';
 import { OnCallPage } from './pages/OnCallPage';
+import { EnterprisePage } from './pages/EnterprisePage';
 import { LoginPage } from './pages/LoginPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Sidebar } from './components/shell/Sidebar';
@@ -73,6 +74,7 @@ function Shell() {
           {activeTab === 'security' && <SecurityPage />}
           {activeTab === 'health' && <HealthPage />}
           {activeTab === 'oncall' && <OnCallPage />}
+          {activeTab === 'enterprise' && <EnterprisePage />}
         </main>
       </div>
     </div>

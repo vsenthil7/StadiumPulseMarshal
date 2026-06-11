@@ -1489,3 +1489,31 @@ Backend **494 pass** (+3); frontend tsc+build green; 7 node RBAC tests.
   in-memory stores (own Alembic revisions); live-cred integration tests.
 
 ### Round 29 — COMPLETE
+
+---
+
+## Round 30 — Frontend pages for P6 width modules
+
+Added the UI surfaces for the new backend modules (the last major remaining item):
+
+- **EnterprisePage** (`frontend/src/pages/EnterprisePage.tsx`) with five sub-tabs:
+  - **Runbooks** — table of seeded runbooks (name/category/steps/tags) + Execute
+    (responder+); recent-executions table.
+  - **Postmortems** — list + create (operator+), status/severity/action-count.
+  - **SLO Catalog** — SLO list + per-SLO burn-policy table (tier/windows/factor/
+    severity/trigger error rate).
+  - **Fleet** — per-venue rollup (open/total incidents, SLO breaching).
+  - **Cost** — total monthly spend + per-service utilisation + right-size flags.
+- New nav entry "Enterprise" (Reliability group, viewer+); wired into App.tsx
+  tab switch. API methods added to `apiExt`; types added to `types/index.ts`
+  (renamed new postmortem type to PostmortemDoc to avoid clashing with the
+  existing Phase-4 Postmortem shape).
+
+Frontend `tsc -b` + `vite build` green; 7 node RBAC tests pass. Backend **494
+pass** unchanged. Live-verified all 7 page-backing endpoints return 200 and the
+SPA serves.
+
+### Round 30 — COMPLETE
+### Reviewer-doc status: P1–P6 backends + infra (P2/P4/P5) + P6 frontend all DONE.
+### Remaining (smaller): SQL-backing the width-module in-memory stores; live-cred
+### integration tests; ChatOps Slack HMAC verification.

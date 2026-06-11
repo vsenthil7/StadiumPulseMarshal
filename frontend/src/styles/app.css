@@ -718,3 +718,5 @@ input.field:focus, select.field:focus { outline: 2px solid rgba(20,85,192,0.25);
 .status-fail { background: rgba(200,60,60,0.15); color: var(--err, #c44); }
 .text-input { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink);
   border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.status-badge.status-warn { background: rgba(220,160,40,0.18); color: #d8a020; }
+.seg.is-active { background: var(--surface-3, #1c2230); color: var(--ink); }

@@ -8,6 +8,7 @@ import type {
   TimelineEntry,
 } from '../types';
 import { http } from './core';
+import { getAuthToken } from './core';
 
 // Barrel: re-export shared core + grouped modules so existing imports from
 // '../api/client' keep working unchanged.
@@ -73,6 +74,14 @@ import type {
   Page,
   ScenarioInfo,
   VenueAnalytics,
+  Runbook,
+  RunbookExecution,
+  PostmortemDoc,
+  SloDef,
+  BurnPolicy,
+  FleetVenue,
+  CostSummary,
+  ChangeEvent,
 } from '../types';
 
 export const apiExt = {
@@ -232,6 +241,33 @@ export const apiExt = {
       method: 'POST',
       body: JSON.stringify({ key }),
     }),
+  // ── P6 enterprise width modules ──────────────────────────────────────────
+  listRunbooks: () =>
+    http<{ runbooks: Runbook[] }>('/runbooks').then((r) => r.runbooks),
+  getRunbook: (id: string) => http<Runbook>(`/runbooks/${encodeURIComponent(id)}`),
+  executeRunbook: (id: string, incidentId?: string) =>
+    http<RunbookExecution>(`/runbooks/${encodeURIComponent(id)}/execute`, {
+      method: 'POST', body: JSON.stringify({ incident_id: incidentId ?? null }),
+    }),
+  listRunbookExecutions: () =>
+    http<{ executions: RunbookExecution[] }>('/runbook-executions').then((r) => r.executions),
+  listPostmortems: () =>
+    http<{ postmortems: PostmortemDoc[] }>('/postmortems').then((r) => r.postmortems),
+  createPostmortem: (body: { title: string; severity?: string; summary?: string; incident_id?: string }) =>
+    http<PostmortemDoc>('/postmortems', { method: 'POST', body: JSON.stringify(body) }),
+  publishPostmortem: (id: string) =>
+    http<PostmortemDoc>(`/postmortems/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
+  exportPostmortem: (id: string) =>
+    fetch(`/api/v1/postmortems/${encodeURIComponent(id)}/export`, {
+      headers: { Authorization: `Bearer ${getAuthToken() ?? ''}` },
+    }).then((r) => r.text()),
+  listSloCatalog: () => http<SloDef[]>('/slo-catalog'),
+  getBurnPolicy: (id: string) =>
+    http<BurnPolicy>(`/slo-catalog/${encodeURIComponent(id)}/burn-policy`),
+  getFleet: () => http<{ venues: FleetVenue[]; venue_count?: number }>('/fleet'),
+  getCostAnalytics: () => http<CostSummary>('/cost-analytics'),
+  listChangeEvents: () =>
+    http<{ events: ChangeEvent[] }>('/change-events').then((r) => r.events),
 };
 
 // --- Phase 3 API ---

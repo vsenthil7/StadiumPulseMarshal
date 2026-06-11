@@ -286,3 +286,108 @@ export interface DeliveryAttempt {
   error: string;
   success: boolean;
 }
+
+// --- P6 enterprise width modules ---
+export interface RunbookStep {
+  order: number;
+  title: string;
+  description: string;
+  command?: string | null;
+  automation_ref?: string | null;
+  verification?: string | null;
+  rollback?: string | null;
+}
+export interface Runbook {
+  id: string;
+  name: string;
+  category: string;
+  version: number;
+  description: string;
+  tags: string[];
+  steps: RunbookStep[];
+  owner: string;
+}
+export interface RunbookExecution {
+  id: string;
+  runbook_id: string;
+  incident_id?: string | null;
+  actor: string;
+  status: string;
+  started_at: string;
+  step_results: Array<Record<string, unknown>>;
+  dispatch_result?: Record<string, unknown> | null;
+}
+export interface ActionItem {
+  id: string;
+  description: string;
+  owner: string;
+  done: boolean;
+}
+export interface PostmortemDoc {
+  id: string;
+  title: string;
+  status: string;
+  severity: string;
+  summary: string;
+  root_cause: string;
+  incident_id?: string | null;
+  action_items: ActionItem[];
+  timeline: Array<{ at: string; text: string; author: string }>;
+  created_at: string;
+}
+export interface SloDef {
+  id: string;
+  name: string;
+  service_id: string;
+  target: number;
+  window_hours: number;
+}
+export interface BurnTierPolicy {
+  name: string;
+  long_hours: number;
+  short_hours: number;
+  factor: number;
+  severity: string;
+  trigger_error_rate: number;
+}
+export interface BurnPolicy {
+  slo_id: string;
+  slo_name: string;
+  target: number;
+  window_hours: number;
+  allowed_error_fraction: number;
+  burn_tiers: BurnTierPolicy[];
+}
+export interface FleetVenue {
+  venue_id: string;
+  open_incidents: number;
+  total_incidents: number;
+  slo_breaching: number;
+  slo_total: number;
+  burn_page_alerts?: number;
+  burn_active_silences?: number;
+}
+export interface ServiceCost {
+  service_id: string;
+  service_name: string;
+  monthly_cost_usd: number;
+  cpu_utilisation: number;
+  memory_utilisation: number;
+  instance_count: number;
+  rightsizing: string;
+}
+export interface CostSummary {
+  total_monthly_cost_usd: number;
+  services: ServiceCost[];
+  downsize_candidates: number;
+  upsize_candidates: number;
+}
+export interface ChangeEvent {
+  id: string;
+  change_type: string;
+  title: string;
+  service_id: string;
+  actor: string;
+  at: string;
+  linked_incident_ids: string[];
+}
