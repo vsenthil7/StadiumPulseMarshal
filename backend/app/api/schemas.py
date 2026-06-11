@@ -64,6 +64,7 @@ class AuditResponse(BaseModel):
 class ExecuteResponse(BaseModel):
     action: RemediationAction
     executed: bool
+    dispatch: dict | None = None
 
 
 class SettingsUpdate(BaseModel):

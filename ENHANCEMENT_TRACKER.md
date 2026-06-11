@@ -1360,3 +1360,28 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **CP2:** docs + package.
 
 ### Round 25 — COMPLETE
+
+---
+
+## Round 26 — Playbook V02: external alert routing + remediation dispatch + CI/E2E
+
+Implemented the genuinely-missing operational deliverables from the V02 playbook
+(infra primitives like idempotency/kv/burn/metrics already existed):
+
+- **P5.S2 — AlertRouter** (`app/services/alert_router.py`): PagerDuty Events v2 +
+  OpsGenie Alerts API; degrades to log-only without creds. Wired into
+  NotificationService.notify_burn_alert (external routing on configured creds).
+  Config: PAGERDUTY_ROUTING_KEY, OPSGENIE_API_KEY. +5 tests (MockTransport).
+- **P5.S3 — RemediationDispatcher** (`app/services/dispatch_service.py`): Cloud
+  Workflows / Ansible AWX / generic webhook; no-op (target=none) without a
+  backend. Wired into the /remediations/{id}/execute route (ExecuteResponse gains
+  a `dispatch` field). Config: CLOUD_WORKFLOWS_URL, ANSIBLE_AWX_URL/TOKEN,
+  REMEDIATION_WEBHOOK_URL. +5 tests (MockTransport).
+- **P1.S1 — CI workflow** (`.github/workflows/ci.yml`): backend pytest+cov,
+  frontend tsc+vite, Playwright e2e, container build.
+- **P1.S2 — Playwright** (`frontend/playwright.config.ts` + `frontend/e2e/smoke.spec.ts`):
+  health + app-load + problems smoke tests.
+
+Backend **450 pass** (+10); frontend tsc -b + vite build green; 7 node RBAC tests.
+
+### Round 26 — COMPLETE (P5.S2, P5.S3, P1.S1, P1.S2)

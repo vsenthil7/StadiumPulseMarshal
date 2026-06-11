@@ -205,7 +205,15 @@ async def execute(
             status_code=409, detail="Remediation must be approved before execution"
         )
     ok = ctx.store.mark_executed(action_id, success=True)
-    return ExecuteResponse(action=action, executed=ok)
+    # Dispatch to the configured automation backend (Cloud Workflows / AWX /
+    # webhook). No-op in mock/demo mode (dispatched=False, target=none).
+    dispatch_result = None
+    try:
+        dispatch_result = await ctx.remediation_dispatcher.dispatch(
+            action, actor=getattr(_p, "subject", "system"))
+    except Exception:  # noqa: BLE001 - execution state stands even if dispatch errors
+        dispatch_result = {"dispatched": False, "target": "none"}
+    return ExecuteResponse(action=action, executed=ok, dispatch=dispatch_result)
 
 
 @router.patch("/settings", response_model=ConfigResponse, tags=["system"])

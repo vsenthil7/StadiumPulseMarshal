@@ -34,6 +34,12 @@ class AppContext:
         # Persistence + services.
         self.repos: RepositoryBundle = build_repositories(self.settings)
         self.notifications = NotificationService(self.repos.notifications)
+        from app.services.alert_router import build_alert_router
+        from app.services.dispatch_service import build_remediation_dispatcher
+
+        self.alert_router = build_alert_router(self.settings)
+        self.remediation_dispatcher = build_remediation_dispatcher(self.settings)
+        self.notifications.set_alert_router(self.alert_router)
         self.escalation = EscalationEngine(
             default_escalation_policies(), default_on_call()
         )

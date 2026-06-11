@@ -90,6 +90,13 @@ class Settings(BaseSettings):
     burn_digest_venue_fanout_interval_seconds: float = Field(default=3600.0)
     # Per-venue webhook URLs, e.g. "venue_arena_north=https://hooks/...,..."
     burn_digest_venue_webhooks: str = Field(default="")
+    # --- P5: external alert routing + remediation dispatch (optional) ---
+    pagerduty_routing_key: str | None = None
+    opsgenie_api_key: str | None = None
+    cloud_workflows_url: str | None = None
+    ansible_awx_url: str | None = None
+    ansible_awx_token: str | None = None
+    remediation_webhook_url: str | None = None
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.

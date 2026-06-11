@@ -74,6 +74,11 @@ class NotificationService:
     def set_oncall_directory(self, directory) -> None:
         self._oncall = directory
 
+    def set_alert_router(self, router) -> None:
+        """Optional external alert router (PagerDuty/OpsGenie). When set,
+        burn-alert notifications are also dispatched externally."""
+        self._alert_router = router
+
     async def notify(
         self,
         incident: Incident,
@@ -197,6 +202,13 @@ class NotificationService:
                 body=alert.message,
             )
             created.append(await self._dispatch(n))
+            # External routing (PagerDuty/OpsGenie) when a router is configured.
+            router = getattr(self, "_alert_router", None)
+            if router is not None and getattr(router, "configured", False):
+                try:
+                    await router.dispatch(n)
+                except Exception:  # noqa: BLE001 - never fail the burn path
+                    pass
         log.info(
             "Burn alert %s (%s) routed to %d channel(s)",
             alert.slo_id, severity, len(created),
