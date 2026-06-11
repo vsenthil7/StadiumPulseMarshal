@@ -197,6 +197,10 @@ export const apiExt = {
     http<{ notifications: NotificationItem[] }>('/notifications').then(
       (r) => r.notifications,
     ),
+  getDigestDeliveries: () =>
+    http<{ notifications: NotificationItem[] }>('/notifications?severity=digest').then(
+      (r) => r.notifications,
+    ),
   getScenarios: () =>
     http<{ scenarios: ScenarioInfo[]; active: string }>('/scenarios'),
   selectScenario: (key: string) =>

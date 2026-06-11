@@ -16,6 +16,33 @@ from app.core.logging import get_logger
 log = get_logger(__name__)
 
 
+async def compose_venue_digest(ctx, venue_id: str) -> str:
+    """A burn digest scoped to a single venue."""
+    alerts = [a for a in await ctx.burn_alerts()
+              if (a.venue_id or "unassigned") == venue_id]
+    page = sum(1 for a in alerts
+               if getattr(a.severity, "value", a.severity) == "page")
+    ticket = sum(1 for a in alerts
+                 if getattr(a.severity, "value", a.severity) == "ticket")
+    totals = await ctx.burn_counters.totals(venue_id)
+    acks = totals.get("ack", 0)
+    sils = totals.get("silence", 0)
+    denom = acks + sils
+    ratio = round(100 * sils / denom) if denom else 0
+    short = venue_id.replace("venue_", "")
+    lines = [
+        f"StadiumPulse burn digest — {short}",
+        f"- Active alerts: {page} page, {ticket} ticket",
+        f"- Response: {acks} acks, {sils} silences (suppression {ratio}%)",
+    ]
+    if alerts:
+        worst = max(alerts, key=lambda a: a.burn_rate)
+        lines.append(
+            f"- Hottest: {worst.slo_name} at {worst.burn_rate:g}x "
+            f"({getattr(worst.severity, 'value', worst.severity)})")
+    return "\n".join(lines)
+
+
 async def compose_daily_digest(ctx) -> str:
     """A 24h rollup digest: lifetime response totals, suppression, active state,
     and the venues with the most burn pressure. Distinct from the hourly
@@ -47,6 +74,68 @@ async def compose_daily_digest(ctx) -> str:
 
 
 _SEV_RANK = {"none": 0, "ticket": 1, "page": 2}
+
+
+def next_run_delay(hh_mm: str, now_epoch: float | None = None) -> float:
+    """Seconds until the next occurrence of local ``HH:MM``.
+
+    If that time has already passed today, returns the delay until tomorrow.
+    """
+    import time as _t
+
+    now = _t.time() if now_epoch is None else now_epoch
+    lt = _t.localtime(now)
+    try:
+        hh, mm = (int(x) for x in hh_mm.split(":"))
+    except (ValueError, AttributeError):
+        hh, mm = 9, 0
+    # seconds since local midnight
+    since_midnight = lt.tm_hour * 3600 + lt.tm_min * 60 + lt.tm_sec
+    target = hh * 3600 + mm * 60
+    delay = target - since_midnight
+    if delay <= 0:
+        delay += 86400
+    return float(delay)
+
+
+class DailyAtScheduler:
+    """Runs a composer+dispatch once per day at a wall-clock ``HH:MM``."""
+
+    def __init__(self, ctx, at: str, composer, dispatch) -> None:
+        self._ctx = ctx
+        self._at = at
+        self._composer = composer
+        self._dispatch = dispatch
+        self._task = None
+
+    def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
+        self._task = asyncio.ensure_future(self._run())
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
+        self._task = None
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await asyncio.sleep(next_run_delay(self._at))
+                msg = await self._composer(self._ctx)
+                if self._dispatch is not None:
+                    await self._dispatch(msg)
+                else:
+                    log.info("Daily burn digest:\n%s", msg)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log.warning("daily digest cycle failed: %s", exc)
 
 
 async def compose_digest(ctx, window_hours: float = 24.0,

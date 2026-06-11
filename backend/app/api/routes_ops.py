@@ -89,6 +89,7 @@ async def list_notifications(
     incident_id: str | None = None,
     source: str | None = None,
     severity: str | None = None,
+    status: str | None = None,
     _p=Depends(require_permission(Permission.INCIDENT_READ)),
 ) -> NotificationListResponse:
     ctx = _ctx(request)
@@ -101,6 +102,11 @@ async def list_notifications(
         ]
     if severity is not None:
         notifications = [n for n in notifications if n.severity == severity]
+    if status is not None:
+        notifications = [
+            n for n in notifications
+            if getattr(n.status, "value", n.status) == status
+        ]
     return NotificationListResponse(notifications=notifications)
 
 

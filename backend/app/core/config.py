@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     burn_daily_digest_enabled: bool = Field(default=False)
     burn_daily_digest_channel: str = Field(default="slack")
     burn_daily_digest_recipient: str = Field(default="#slo-daily")
+    burn_daily_digest_at: str = Field(default="09:00")
+    # Per-venue digest channel routing, e.g. "venue_arena_north=#north,..."
+    burn_digest_venue_channels: str = Field(default="")
     # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
     metric_selector_map: str = Field(default="")
     # Security hardening toggles.
@@ -164,6 +167,16 @@ class Settings(BaseSettings):
     def metric_selector_mapping(self) -> dict[str, str]:
         out: dict[str, str] = {}
         for pair in self.metric_selector_map.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    @property
+    def burn_digest_venue_channel_map(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.burn_digest_venue_channels.split(","):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)

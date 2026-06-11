@@ -89,18 +89,23 @@ async def slo_burn_events(
 @router.get("/slo/burn-digest", tags=["slo"])
 async def slo_burn_digest(
     request: Request, hours: float = 24.0, min_severity: str = "ticket",
-    kind: str = "hourly", dispatch: bool = False,
+    kind: str = "hourly", venue_id: str | None = None, dispatch: bool = False,
     principal: Principal = Depends(require_permission(Permission.SLO_READ)),
 ) -> dict:
     """Preview (or dispatch) the burn/suppression digest.
 
-    ``kind=daily`` previews the 24h rollup summary. ``dispatch=true`` sends it on
-    the configured channel (responder+ required).
+    ``kind=daily`` previews the 24h rollup. ``venue_id`` scopes the digest to one
+    venue and, on dispatch, routes to that venue's configured channel (falling
+    back to the default recipient). ``dispatch=true`` requires responder+.
     """
-    from app.services.digest_service import compose_daily_digest, compose_digest
+    from app.services.digest_service import (
+        compose_daily_digest, compose_digest, compose_venue_digest)
 
     ctx = _ctx(request)
-    if kind == "daily":
+    if venue_id is not None:
+        require_venue_access(principal, venue_id)
+        msg = await compose_venue_digest(ctx, venue_id)
+    elif kind == "daily":
         msg = await compose_daily_digest(ctx)
     else:
         msg = await compose_digest(ctx, hours, min_severity)
@@ -114,13 +119,20 @@ async def slo_burn_digest(
         ch = NotificationChannel(ch_name) \
             if ch_name in {c.value for c in NotificationChannel} \
             else NotificationChannel.SLACK
+        recipient = ctx.settings.burn_digest_recipient
+        if venue_id is not None:
+            recipient = ctx.settings.burn_digest_venue_channel_map.get(
+                venue_id, recipient)
         await ctx.notifications.notify_digest(
-            msg, channel=ch, recipient=ctx.settings.burn_digest_recipient,
+            msg, channel=ch, recipient=recipient,
             webhook_url=ctx.settings.burn_digest_webhook_url,
             webhook_poster=ctx.webhook_dispatcher.post_message,
         )
         sent = True
-    return {"digest": msg, "dispatched": sent}
+    return {"digest": msg, "dispatched": sent, "recipient": (
+        ctx.settings.burn_digest_venue_channel_map.get(
+            venue_id, ctx.settings.burn_digest_recipient)
+        if venue_id is not None else ctx.settings.burn_digest_recipient)}
 
 
 @router.get("/slo/burn-by-venue", tags=["slo"])

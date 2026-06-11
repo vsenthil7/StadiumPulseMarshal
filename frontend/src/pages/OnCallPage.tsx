@@ -35,6 +35,7 @@ export function OnCallPage() {
   const [stats, setStats] = useState<{ window_hours?: number; counts: Record<string, number>; suppression_ratio: number; active_acks: number; active_silences: number; most_silenced: { target: string; ack: number; silence: number }[] } | null>(null);
   const [trend, setTrend] = useState<{ index: number; ack: number; silence: number; start_epoch: number }[]>([]);
   const [byVenue, setByVenue] = useState<{ venue_id: string; page: number; ticket: number; active_acks: number; active_silences: number; suppression_ratio?: number }[]>([]);
+  const [digests, setDigests] = useState<{ id: string; subject: string; recipient: string; status: string; created_at: string }[]>([]);
   const [histFilter, setHistFilter] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -55,6 +56,7 @@ export function OnCallPage() {
     apiExt.getBurnStats(24).then((s) => ok && setStats(s)).catch(() => ok && setStats(null));
     apiExt.getBurnTrend(24, 12).then((t) => ok && setTrend(t.buckets)).catch(() => ok && setTrend([]));
     apiExt.getBurnByVenue().then((r) => ok && setByVenue(r.venues)).catch(() => ok && setByVenue([]));
+    apiExt.getDigestDeliveries().then((d) => ok && setDigests(d)).catch(() => ok && setDigests([]));
     loadHistory('');
     return () => {
       ok = false;
@@ -217,6 +219,32 @@ export function OnCallPage() {
                     <td>{v.active_acks}</td>
                     <td>{v.active_silences}</td>
                     <td>{v.suppression_ratio != null ? `${Math.round(v.suppression_ratio * 100)}%` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {digests.length > 0 && (
+        <div className="panel">
+          <header><h3>Digest delivery history</h3></header>
+          <div className="body">
+            <table className="data-table">
+              <thead>
+                <tr><th>When</th><th>Recipient</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {digests.slice(0, 15).map((d) => (
+                  <tr key={d.id}>
+                    <td className="mono">{new Date(d.created_at).toLocaleString()}</td>
+                    <td>{d.recipient}</td>
+                    <td>
+                      <span className={`status-badge ${d.status === 'SENT' ? 'status-ok' : 'status-fail'}`}>
+                        {d.status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

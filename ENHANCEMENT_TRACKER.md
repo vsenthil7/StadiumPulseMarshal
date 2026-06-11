@@ -1187,3 +1187,60 @@ Broad round across infra, security, analytics and supporting modules. No descope
   unit tests pass. **CA2:** docs + package.
 
 ### Round 22 — COMPLETE
+
+---
+
+## Round 23 — Slack payload, wall-clock daily digest, digest delivery history, per-venue routing
+
+### Track CB — Slack-format webhook payload
+| # | Sprint | Status |
+|---|--------|--------|
+| CB1 | format_slack_payload(message, channel) → blocks/text shape | 🟢 |
+| CB2 | notify_digest sends slack-shaped body when channel=slack | 🟢 |
+| CB3 | Tests: slack payload shape; generic text otherwise | 🟢 |
+
+### Track CC — wall-clock daily digest scheduling
+| # | Sprint | Status |
+|---|--------|--------|
+| CC1 | next_run_at(hh:mm) helper; scheduler sleeps to wall-clock time | 🟢 |
+| CC2 | Config BURN_DAILY_DIGEST_AT=HH:MM; daily scheduler uses it | 🟢 |
+| CC3 | Tests: next_run_at computes correct delay across midnight | 🟢 |
+
+### Track CD — digest delivery history view
+| # | Sprint | Status |
+|---|--------|--------|
+| CD1 | /notifications filter by status (SENT/FAILED); digest source | 🟢 |
+| CD2 | Frontend: digest delivery panel on On-call (status badges) | 🟢 |
+| CD3 | Tests: status filter | 🟢 |
+
+### Track CE — per-venue digest routing
+| # | Sprint | Status |
+|---|--------|--------|
+| CE1 | compose_venue_digest(venue): venue-scoped burn summary | 🟢 |
+| CE2 | /slo/burn-digest?venue_id=&dispatch routes to venue channel map | 🟢 |
+| CE3 | Config BURN_DIGEST_VENUE_CHANNELS=venue=#chan,... | 🟢 |
+| CE4 | Tests: venue digest content; routing map | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| CF1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| CF2 | Docs + package | 🟢 |
+
+### Round 23 changelog
+- **CB — Slack payload:** format_webhook_payload shapes slack (header+section
+  blocks + text fallback) vs generic {text,channel,source}; notify_digest uses it.
+  +tests. Live-verified blocks shape.
+- **CC — wall-clock daily:** next_run_delay(HH:MM) + DailyAtScheduler sleeps to the
+  configured local time (BURN_DAILY_DIGEST_AT, default 09:00); context uses it.
+  +tests. Live-verified 08:00->09:00 = 3600s, and past-time wraps to next day.
+- **CD — delivery history:** /notifications adds a status filter (SENT/FAILED);
+  On-call page shows a digest delivery-history panel with status badges. +test.
+  Live-verified status filter.
+- **CE — per-venue routing:** compose_venue_digest(venue); /slo/burn-digest accepts
+  venue_id (venue-scoped, venue-access checked) and routes dispatch to
+  BURN_DIGEST_VENUE_CHANNELS map. +tests. Live-verified routing to #north-room.
+- **CF1:** backend **422 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass. **CF2:** docs + package.
+
+### Round 23 — COMPLETE

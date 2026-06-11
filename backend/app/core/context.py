@@ -408,7 +408,7 @@ class AppContext:
             self.digest_scheduler.start()
         if self.settings.burn_daily_digest_enabled:
             from app.services.digest_service import (
-                DigestScheduler, compose_daily_digest)
+                DailyAtScheduler, compose_daily_digest)
             from app.models.notification import NotificationChannel
 
             dch = NotificationChannel(self.settings.burn_daily_digest_channel) \
@@ -422,9 +422,9 @@ class AppContext:
                     webhook_url=self.settings.burn_digest_webhook_url,
                     webhook_poster=self.webhook_dispatcher.post_message)
 
-            self.daily_digest_scheduler = DigestScheduler(
-                self, 24 * 3600, dispatch=_dispatch_daily,
-                composer=compose_daily_digest)
+            self.daily_digest_scheduler = DailyAtScheduler(
+                self, self.settings.burn_daily_digest_at,
+                composer=compose_daily_digest, dispatch=_dispatch_daily)
             self.daily_digest_scheduler.start()
 
     async def probe_readiness(self) -> dict:

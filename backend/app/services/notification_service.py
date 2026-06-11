@@ -41,6 +41,31 @@ _BURN_ROUTING: dict[str, list[tuple[NotificationChannel, str]]] = {
 }
 
 
+def format_webhook_payload(message: str, channel, recipient: str) -> dict:
+    """Shape the outbound webhook body for the target channel.
+
+    Slack gets a blocks+text payload (its expected shape); everything else gets a
+    generic ``{text, channel, source}`` body.
+    """
+    ch = getattr(channel, "value", channel)
+    if ch == "slack":
+        lines = message.split("\n")
+        header = lines[0] if lines else "Burn digest"
+        body = "\n".join(lines[1:]) if len(lines) > 1 else ""
+        return {
+            "channel": recipient,
+            "text": message,  # fallback for notifications/clients
+            "blocks": [
+                {"type": "header",
+                 "text": {"type": "plain_text", "text": header[:150]}},
+                {"type": "section",
+                 "text": {"type": "mrkdwn", "text": body or header}},
+            ],
+            "source": "burn_digest",
+        }
+    return {"text": message, "channel": recipient, "source": "burn_digest"}
+
+
 class NotificationService:
     def __init__(self, repo: NotificationRepository, oncall_directory=None) -> None:
         self._repo = repo
@@ -103,8 +128,7 @@ class NotificationService:
             try:
                 delivered = await webhook_poster(
                     webhook_url,
-                    {"text": message, "channel": recipient,
-                     "source": "burn_digest"},
+                    format_webhook_payload(message, ch, recipient),
                 )
             except Exception:  # noqa: BLE001
                 delivered = False

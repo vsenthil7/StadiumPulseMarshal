@@ -765,3 +765,27 @@ own daily scheduler and channel; preview via `GET /slo/burn-digest?kind=daily`.
 
 ### Tests
 Backend **415 pass** (+6 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 23 — Slack payload, wall-clock daily digest, delivery history, per-venue routing
+
+### Slack-shaped webhook payload
+Digest webhook bodies are now shaped per channel: Slack receives header+section
+blocks (with a text fallback); other channels get a generic text body.
+
+### Wall-clock daily digest
+The daily digest runs at a configured local time (`BURN_DAILY_DIGEST_AT`, e.g.
+09:00) via a wall-clock scheduler, rather than a fixed interval from start.
+
+### Digest delivery history
+`/notifications` accepts a `status` filter (SENT/FAILED); the On-call page shows
+a digest delivery-history panel with status badges so failed sends are visible.
+
+### Per-venue digest routing
+`GET /slo/burn-digest?venue_id=...` composes a venue-scoped digest and, on
+dispatch, routes to that venue's channel from `BURN_DIGEST_VENUE_CHANNELS`
+(falling back to the default recipient). Venue access is enforced.
+
+### Tests
+Backend **422 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.
