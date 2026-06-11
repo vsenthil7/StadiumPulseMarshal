@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     # Optional shared backend for cross-instance rate-limiting (and future
     # shared counters). When set, auth limits are global across replicas.
     redis_url: str | None = None
+    # On-call schedule source (PagerDuty/Opsgenie-shaped). When set, the current
+    # on-call roster is pulled from the schedule API; else static/rotating.
+    oncall_api_url: str | None = None
+    oncall_api_token: str | None = None
+    # Map schedule id → tier name, e.g. "SCHED_A=TIER3,SCHED_B=TIER2".
+    oncall_schedule_tier_map: str = Field(default="")
+    # Per-SLI metric selector overrides, e.g. "pay_avail=builtin:...,lat=builtin:..."
+    metric_selector_map: str = Field(default="")
     # Security hardening toggles.
     security_headers_enabled: bool = Field(default=True)
     hsts_enabled: bool = Field(default=False)  # enable only behind TLS
@@ -119,6 +127,26 @@ class Settings(BaseSettings):
     def venue_zone_id_mapping(self) -> dict[str, str]:
         out: dict[str, str] = {}
         for pair in self.venue_zone_id_map.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    @property
+    def oncall_schedule_tier_mapping(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.oncall_schedule_tier_map.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    @property
+    def metric_selector_mapping(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.metric_selector_map.split(","):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)

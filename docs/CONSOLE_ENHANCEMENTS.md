@@ -540,3 +540,30 @@ fires.
 
 ### Tests
 Backend **356 pass** (+14 this round). Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 15 — Schedule-aware on-call, per-SLI metric selectors, banner targets
+
+### On-call schedule source (rotation + external adapter)
+The on-call roster is now resolved from a `ScheduleSource` rather than a fixed
+list: `RotatingScheduleSource` rotates a per-tier pool on a fixed shift cadence
+(with a `next_handoff`), and `ExternalScheduleSource` pulls the current on-calls
+from a PagerDuty/Opsgenie-shaped `/oncalls` API (schedule→tier mapping, graceful
+fallback to static). The directory is refreshed before burn routing and on
+`/oncall` reads, so alerts always page whoever holds the pager now.
+
+### Per-SLI Dynatrace metric selectors
+`DynatraceMetricsSource` now chooses the metric selector by SLI kind
+(availability/error → error rate, latency → response time, throughput → request
+count, saturation → CPU), filtered to the SLO's service entity, with a per-SLI
+`METRIC_SELECTOR_MAP` override for bespoke metrics.
+
+### Burn → on-call target on the banner
+`/slo/burn-alerts` enriches each alert with its resolved on-call targets, and the
+Reliability burn banner shows "pages <who>" inline — so an operator sees who a
+burn would wake without leaving the page. The On-call page surfaces the schedule
+source and the next-handoff time.
+
+### Tests
+Backend **366 pass** (+10 this round). Frontend `tsc -b` + `vite build` green.

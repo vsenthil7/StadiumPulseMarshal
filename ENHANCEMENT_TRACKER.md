@@ -793,3 +793,67 @@ Broad round across infra, security, analytics and supporting modules. No descope
 - **AI2:** docs + package.
 
 ### Round 14 — COMPLETE
+
+---
+
+## Round 15 — Schedule-aware on-call source, per-SLI metric selectors, banner targets, +depth
+
+### Track AJ — roster/schedule source behind OnCallDirectory
+| # | Sprint | Status |
+|---|--------|--------|
+| AJ1 | ScheduleSource protocol; StaticScheduleSource (current default roster) | 🟢 |
+| AJ2 | Time-aware rotation: shifts by hour/day → who is on-call NOW per tier | 🟢 |
+| AJ3 | PagerDuty/Opsgenie-shaped adapter (oncalls API) w/ graceful fallback | 🟢 |
+| AJ4 | OnCallDirectory consumes resolved roster; context wires source | 🟢 |
+| AJ5 | Tests: rotation picks right engineer by time; adapter parse+fallback | 🟢 |
+
+### Track AK — per-SLI Dynatrace metric selectors
+| # | Sprint | Status |
+|---|--------|--------|
+| AK1 | SLI→metric selector map by kind (availability/latency/error/...) | 🟢 |
+| AK2 | DynatraceMetricsSource uses per-SLI selector (config override) | 🟢 |
+| AK3 | Config: metric selector overrides per SLI key | 🟢 |
+| AK4 | Tests: selector chosen by kind; override honored | 🟢 |
+
+### Track AL — burn→on-call target on Reliability banner
+| # | Sprint | Status |
+|---|--------|--------|
+| AL1 | /slo/burn-alerts includes resolved on-call targets per alert | 🟢 |
+| AL2 | Frontend banner shows "pages: <who> via <channels>" inline | 🟢 |
+| AL3 | Tests + tsc/build | 🟢 |
+
+### Track AM — supporting depth
+| # | Sprint | Status |
+|---|--------|--------|
+| AM1 | /oncall shows current-shift + next-shift handoff time | 🟢 |
+| AM2 | On-call page surfaces current shift + rotation | 🟢 |
+| AM3 | Tests + tsc/build | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| AN1 | Full backend suite + frontend tsc/build + node unit green | 🟢 |
+| AN2 | Docs + package | 🟢 |
+
+### Round 15 changelog
+- **Track AJ — schedule-aware on-call source:** ScheduleSource protocol;
+  StaticScheduleSource, RotatingScheduleSource (deterministic shift rotation +
+  next_handoff), ExternalScheduleSource (PagerDuty/Opsgenie /oncalls adapter,
+  schedule→tier map, graceful fallback). OnCallDirectory is now rebuildable;
+  context refreshes it from the schedule source before burn routing and on
+  /oncall reads. +8 tests. Caught+fixed a now=0 falsy bug.
+- **Track AK — per-SLI Dynatrace metric selectors:** _metric_selector_for picks
+  the builtin metric by SLI kind (availability/error→errors.rate, latency→
+  response.time, throughput→requestCount, saturation→cpu.usage), filtered to the
+  service entity, with a per-SLI config override (METRIC_SELECTOR_MAP). +2 tests.
+- **Track AL — burn→on-call target on banner:** /slo/burn-alerts enriches each
+  alert with resolved on_call_targets; the Reliability burn banner shows "pages
+  <who>" inline. +tests via existing burn suite. Live-verified.
+- **Track AM — shift provenance:** /oncall returns schedule type + next-handoff;
+  On-call page shows the source and minutes-to-handoff; roster reflects the
+  resolved current shift.
+- **AN1:** backend **366 pass**; frontend tsc -b + vite build green; 7 node RBAC
+  unit tests pass.
+- **AN2:** docs + package.
+
+### Round 15 — COMPLETE

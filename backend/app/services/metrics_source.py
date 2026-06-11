@@ -23,7 +23,7 @@ import httpx
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.models.slo import SLO
+from app.models.slo import SLO, SLIKind
 
 log = get_logger(__name__)
 
@@ -98,14 +98,9 @@ class DynatraceMetricsSource:
         owns = self._http is None
         http = self._http or httpx.AsyncClient(timeout=5.0)
         try:
-            # Error-rate metric for the SLO's service entity (representative
-            # selector; a real mapping would be configured per SLI).
             url = f"{base}/api/v2/metrics/query"
             params = {
-                "metricSelector": (
-                    f"builtin:service.errors.total.rate:filter("
-                    f"eq(dt.entity.service,{slo.service_id}))"
-                ),
+                "metricSelector": _metric_selector_for(slo, self._settings),
                 "from": f"now-{int(lookback_hours)}h",
                 "resolution": "5m",
             }
@@ -125,6 +120,31 @@ class DynatraceMetricsSource:
         finally:
             if owns:
                 await http.aclose()
+
+
+def _metric_selector_for(slo: SLO, settings: Settings) -> str:
+    """Pick the Dynatrace metric selector for an SLO's SLI.
+
+    A per-SLI override (config ``METRIC_SELECTOR_MAP`` keyed by the SLI key)
+    wins; otherwise a sensible builtin is chosen by SLI kind. The selector is
+    filtered to the SLO's service entity. The metric is expressed so a higher
+    value means "worse" (error-like), matching the error-rate sample convention.
+    """
+    override = settings.metric_selector_mapping.get(slo.sli.key)
+    if override:
+        return override
+    svc = slo.service_id
+    flt = f":filter(eq(dt.entity.service,{svc}))"
+    kind = slo.sli.kind
+    if kind == SLIKind.AVAILABILITY or kind == SLIKind.ERROR_RATE:
+        return f"builtin:service.errors.total.rate{flt}"
+    if kind == SLIKind.LATENCY:
+        return f"builtin:service.response.time{flt}"
+    if kind == SLIKind.THROUGHPUT:
+        return f"builtin:service.requestCount.total{flt}"
+    if kind == SLIKind.SATURATION:
+        return f"builtin:tech.generic.cpu.usage{flt}"
+    return f"builtin:service.errors.total.rate{flt}"
 
 
 def _parse_dt_timeseries(data: dict) -> list[ErrorSample]:

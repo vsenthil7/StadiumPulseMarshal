@@ -40,6 +40,11 @@ class AppContext:
 
         self.oncall_directory = OnCallDirectory(default_on_call())
         self.notifications.set_oncall_directory(self.oncall_directory)
+        from app.services.schedule_source import build_schedule_source
+
+        self.schedule_source = build_schedule_source(
+            self.settings, default_on_call()
+        )
         # Event bus + webhook dispatcher.
         import httpx
 
@@ -103,6 +108,16 @@ class AppContext:
             self.settings.auth_rate_limit_per_minute, kv=self.kv
         )
         self.current_scenario = self._initial_scenario()
+
+    async def refresh_oncall(self) -> None:
+        """Refresh the on-call directory from the schedule source (current
+        shift). Best-effort — failures leave the existing roster in place."""
+        try:
+            roster = await self.schedule_source.current_roster()
+            if roster:
+                self.oncall_directory.set_roster(roster)
+        except Exception:  # pragma: no cover - defensive
+            pass
 
     async def ensure_metrics_backfill(self) -> None:
         """Prime MetricsHistory with a real per-window error series from the
@@ -241,6 +256,7 @@ class AppContext:
 
         await self.ensure_entity_venue_map()
         await self.ensure_metrics_backfill()
+        await self.refresh_oncall()
         budgets = await self.repos.slo.list_budgets()
         if not budgets:
             budgets = await self.evaluate_slos()
@@ -255,6 +271,15 @@ class AppContext:
             alerts = [
                 a for a in alerts
                 if a.venue_id is None or a.venue_id in allowed
+            ]
+        # Attach resolved on-call targets so callers (and the UI) can show who
+        # a given burn alert would page, before/without dispatch.
+        for a in alerts:
+            sev = a.severity.value if hasattr(a.severity, "value") else str(a.severity)
+            a.on_call_targets = [
+                {"name": t.name, "tier": t.tier.value, "recipient": t.recipient,
+                 "channels": [c.value for c in t.channels]}
+                for t in self.oncall_directory.targets_for_severity(sev)
             ]
         # Auto-route page/ticket burn alerts to notification channels (the
         # service dedupes per slo+severity within the alert window).

@@ -122,6 +122,7 @@ export const apiExt = {
         venue_id: string | null; severity: string; burn_rate: number;
         long_window_hours: number; short_window_hours: number;
         error_budget_consumed_pct: number; message: string;
+        on_call_targets?: { name: string; tier: string; recipient: string; channels: string[] }[];
       }[];
       page_count: number; ticket_count: number;
     }>('/slo/burn-alerts'),
@@ -133,6 +134,7 @@ export const apiExt = {
         steps: { tier: string; after_minutes: number; notify_channels: string[] }[];
       }[];
       burn_targets: Record<string, { name: string; tier: string; recipient: string; channels: string[] }[]>;
+      schedule?: { type: string; next_handoff_epoch?: number; now_epoch?: number };
     }>('/oncall'),
   getNotifications: () =>
     http<{ notifications: NotificationItem[] }>('/notifications').then(

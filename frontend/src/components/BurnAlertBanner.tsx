@@ -12,6 +12,7 @@ interface BurnAlert {
   burn_rate: number;
   error_budget_consumed_pct: number;
   message: string;
+  on_call_targets?: { name: string; tier: string; recipient: string; channels: string[] }[];
 }
 
 export function BurnAlertBanner() {
@@ -57,6 +58,11 @@ export function BurnAlertBanner() {
               {a.severity}
             </span>
             <span className="burn-msg">{a.message}</span>
+            {a.on_call_targets && a.on_call_targets.length > 0 && (
+              <span className="burn-pages">
+                pages {a.on_call_targets.map((t) => t.name).join(', ')}
+              </span>
+            )}
             <span className="burn-pct">{a.error_budget_consumed_pct}%/h</span>
           </li>
         ))}

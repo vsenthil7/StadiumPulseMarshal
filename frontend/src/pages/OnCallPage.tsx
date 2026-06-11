@@ -11,6 +11,7 @@ interface OnCallData {
     steps: { tier: string; after_minutes: number; notify_channels: string[] }[];
   }[];
   burn_targets: Record<string, { name: string; tier: string; recipient: string; channels: string[] }[]>;
+  schedule?: { type: string; next_handoff_epoch?: number; now_epoch?: number };
 }
 
 const TIER_LABEL: Record<string, string> = {
@@ -43,6 +44,17 @@ export function OnCallPage() {
       <div className="panel">
         <header><h3>On-call roster</h3></header>
         <div className="body">
+          {data.schedule && (
+            <p className="hint">
+              Source: {data.schedule.type}
+              {data.schedule.next_handoff_epoch && data.schedule.now_epoch && (
+                <> · next handoff in{' '}
+                {Math.max(0, Math.round(
+                  (data.schedule.next_handoff_epoch - data.schedule.now_epoch) / 60,
+                ))}{' '}min</>
+              )}
+            </p>
+          )}
           <table className="data-table">
             <thead>
               <tr><th>Tier</th><th>Engineer</th><th>Handle</th><th>Channels</th></tr>

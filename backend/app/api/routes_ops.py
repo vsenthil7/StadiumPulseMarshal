@@ -114,13 +114,14 @@ async def get_oncall(
     would notify (so SREs can see routing before an alert fires).
     """
     ctx = _ctx(request)
+    await ctx.refresh_oncall()
     esc = ctx.escalation
     roster = [
         {
             "id": e.id, "name": e.name, "tier": e.tier.value,
             "handle": e.handle, "channels": e.channels,
         }
-        for e in esc._on_call  # roster is operational reference data
+        for e in ctx.oncall_directory.roster
     ]
     policies = [
         {
@@ -141,7 +142,18 @@ async def get_oncall(
         ]
         for sev in ("page", "ticket")
     }
-    return {"roster": roster, "policies": policies, "burn_targets": burn_targets}
+    # Surface schedule provenance + next handoff when a rotating schedule is used.
+    import time as _time
+
+    src = ctx.schedule_source
+    schedule = {"type": type(src).__name__}
+    if hasattr(src, "next_handoff"):
+        schedule["next_handoff_epoch"] = src.next_handoff()
+        schedule["now_epoch"] = _time.time()
+    return {
+        "roster": roster, "policies": policies, "burn_targets": burn_targets,
+        "schedule": schedule,
+    }
 
 
 @router.get("/scenarios", response_model=ScenarioListResponse, tags=["scenarios"])

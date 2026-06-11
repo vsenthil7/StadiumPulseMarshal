@@ -153,6 +153,7 @@ class BurnAlert(BaseModel):
     factor: float
     error_budget_consumed_pct: float
     message: str = ""
+    on_call_targets: list[dict] = Field(default_factory=list)
     at: datetime = Field(default_factory=_utcnow)
 
 

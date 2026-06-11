@@ -40,9 +40,18 @@ class OnCallTarget:
 class OnCallDirectory:
     def __init__(self, roster: list[OnCallEngineer]) -> None:
         self._by_tier: dict[EscalationTier, OnCallEngineer] = {}
+        self.set_roster(roster)
+
+    def set_roster(self, roster: list[OnCallEngineer]) -> None:
+        by_tier: dict[EscalationTier, OnCallEngineer] = {}
         for eng in roster:
-            # First engineer per tier wins (roster is ordered by precedence).
-            self._by_tier.setdefault(eng.tier, eng)
+            by_tier.setdefault(eng.tier, eng)
+        self._by_tier = by_tier
+        self._roster = list(roster)
+
+    @property
+    def roster(self) -> list[OnCallEngineer]:
+        return list(self._roster)
 
     def engineer_for_tier(self, tier: EscalationTier) -> OnCallEngineer | None:
         return self._by_tier.get(tier)

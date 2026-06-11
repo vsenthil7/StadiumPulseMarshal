@@ -102,3 +102,31 @@ async def test_dynatrace_source_falls_back_on_error():
         assert len(series) > 0
     finally:
         await http.aclose()
+
+
+# ── Per-SLI metric selectors ────────────────────────────────────────────────
+def _slo_kind(kind, key="k"):
+    from app.models.slo import SLO, SLI
+    return SLO(id="S", name="n", service_id="SVC-X",
+               sli=SLI(kind=kind, key=key, unit="u", entity_id="SVC-X"),
+               target=0.99, window_hours=24)
+
+
+def test_selector_chosen_by_kind():
+    from app.models.slo import SLIKind
+    from app.services.metrics_source import _metric_selector_for
+    s = Settings()
+    assert "service.errors" in _metric_selector_for(_slo_kind(SLIKind.AVAILABILITY), s)
+    assert "response.time" in _metric_selector_for(_slo_kind(SLIKind.LATENCY), s)
+    assert "requestCount" in _metric_selector_for(_slo_kind(SLIKind.THROUGHPUT), s)
+    assert "cpu.usage" in _metric_selector_for(_slo_kind(SLIKind.SATURATION), s)
+    # filtered to the service entity
+    assert "SVC-X" in _metric_selector_for(_slo_kind(SLIKind.AVAILABILITY), s)
+
+
+def test_selector_override_wins():
+    from app.models.slo import SLIKind
+    from app.services.metrics_source import _metric_selector_for
+    s = Settings(metric_selector_map="paykey=builtin:custom.metric:filter(x)")
+    sel = _metric_selector_for(_slo_kind(SLIKind.LATENCY, key="paykey"), s)
+    assert sel == "builtin:custom.metric:filter(x)"
