@@ -50,7 +50,7 @@ class DynatraceZoneSource:
         self._settings = settings
         self._http = http
 
-    async def _fetch_zones(self) -> list[str]:
+    async def _fetch_zones(self) -> list[dict]:
         base = (self._settings.dt_tenant_url or "").rstrip("/")
         token = self._settings.dt_api_token
         if not base or not token:
@@ -62,28 +62,41 @@ class DynatraceZoneSource:
             r = await http.get(url, headers={"Authorization": f"Api-Token {token}"})
             r.raise_for_status()
             data = r.json()
-            return [z.get("name", "") for z in data.get("values", []) if z.get("name")]
+            return [
+                {"id": str(z.get("id", "")), "name": z.get("name", "")}
+                for z in data.get("values", [])
+                if z.get("name") or z.get("id")
+            ]
         finally:
             if owns:
                 await http.aclose()
 
     async def zone_to_venue(self) -> dict[str, str]:
-        static = dict(self._settings.venue_zone_mapping)
+        static_name = dict(self._settings.venue_zone_mapping)
+        id_map = dict(self._settings.venue_zone_id_mapping)
         try:
             zones = await self._fetch_zones()
         except Exception as exc:  # noqa: BLE001 - optional source, never fatal
             log.warning("Dynatrace zone fetch failed; using static map: %s", exc)
-            return static
-        # Auto-map zones whose name matches a venue id suffix or a configured
-        # alias; static config entries always take precedence.
+            return static_name
+        # Resolve each zone with precedence: zone-id map (stable across renames)
+        # wins, then static name map. The resulting key is the zone NAME (what
+        # entity tags carry as `mz:<name>`) so the resolver can match entities.
         merged: dict[str, str] = {}
-        for zone in zones:
-            # Heuristic: a zone named exactly like a configured alias maps via
-            # static; otherwise leave to static. (Conservative — we never invent
-            # a venue id from a zone name alone.)
-            if zone in static:
-                merged[zone] = static[zone]
-        merged.update(static)
+        # Start from static-name config as the base.
+        merged.update(static_name)
+        # Live zones resolved by id or matching static name.
+        for z in zones:
+            zid, zname = z.get("id", ""), z.get("name", "")
+            venue = id_map.get(zid) or static_name.get(zname)
+            if venue and zname:
+                merged[zname] = venue
+        # Zone-id mapping is the most stable signal — apply it last so it wins
+        # over a name-based entry for the same zone.
+        for z in zones:
+            zid, zname = z.get("id", ""), z.get("name", "")
+            if zid in id_map and zname:
+                merged[zname] = id_map[zid]
         return merged
 
 

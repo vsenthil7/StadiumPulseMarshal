@@ -84,6 +84,9 @@ class AppContext:
             self.refresh_tokens.prune,
             interval_seconds=self.settings.refresh_prune_interval_seconds,
         )
+        from app.services.rate_limiter import RateLimiter
+
+        self.auth_limiter = RateLimiter(self.settings.auth_rate_limit_per_minute)
         self.current_scenario = self._initial_scenario()
 
     async def ensure_entity_venue_map(self) -> None:

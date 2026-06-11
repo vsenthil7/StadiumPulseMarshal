@@ -101,3 +101,49 @@ async def test_live_source_static_overrides_win():
         assert m["Arena North"] == "venue_special"
     finally:
         await http.aclose()
+
+
+# ── Track H: zone-id mapping (stable across renames) ────────────────────────
+@pytest.mark.asyncio
+async def test_live_source_maps_by_zone_id():
+    settings = Settings(
+        dt_tenant_url="https://abc.live.dynatrace.com",
+        dt_api_token="dt0c01.xxx",
+        venue_zone_id_map="111=venue_arena_north,222=venue_olympic_park",
+    )
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"values": [
+            {"id": 111, "name": "Stadium A"},
+            {"id": 222, "name": "Stadium B"},
+        ]})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        m = await DynatraceZoneSource(settings, http=http).zone_to_venue()
+        # mapped by id → keyed by the zone NAME for entity-tag matching
+        assert m["Stadium A"] == "venue_arena_north"
+        assert m["Stadium B"] == "venue_olympic_park"
+    finally:
+        await http.aclose()
+
+
+@pytest.mark.asyncio
+async def test_zone_id_map_takes_precedence_over_name():
+    settings = Settings(
+        dt_tenant_url="https://abc.live.dynatrace.com",
+        dt_api_token="dt0c01.xxx",
+        venue_zone_id_map="111=venue_by_id",
+        venue_zone_map="Stadium A=venue_by_name",
+    )
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"values": [{"id": 111, "name": "Stadium A"}]})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        m = await DynatraceZoneSource(settings, http=http).zone_to_venue()
+        # id map wins over a name-based entry for the same live zone
+        assert m["Stadium A"] == "venue_by_id"
+    finally:
+        await http.aclose()

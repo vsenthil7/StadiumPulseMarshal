@@ -346,3 +346,33 @@ static — the optional live source never hard-fails the resolver.
 ### Tests
 Backend **290 pass** (+12 this round: hash-at-rest, scheduler, zone sources).
 Frontend `tsc -b` + `vite build` green.
+
+---
+
+## Round 9 — Auto zone-id mapping + auth rate-limiting + auth audit events
+
+### Fully-automatic zone mapping by stable id
+`VENUE_ZONE_ID_MAP` (`zoneId=venue`) lets the live `DynatraceZoneSource` map
+management zones by their **id** — stable across zone renames — in addition to
+name. The source fetches id+name and keys the result by zone name (what entity
+tags carry as `mz:<name>`). Precedence is zone-id map > static name map, so an
+operator can pin a venue by id regardless of how the zone is named.
+
+### Always-on auth rate-limiting
+A reusable `RateLimiter` token bucket protects `/auth/login` and `/auth/refresh`
+with a strict per-IP limit (`AUTH_RATE_LIMIT_PER_MINUTE`, default 10),
+independent of the global middleware toggle — so credential-stuffing and
+token-guessing are throttled even when the global limiter is off. Over the limit
+returns 429 with `Retry-After`; the client IP is taken from `X-Forwarded-For`
+when present. Verified live: the 4th rapid login attempt returns 429 while a
+request from a different IP is unaffected.
+
+### Auth audit trail
+Every auth event is now recorded in the existing audit log: login
+success/failure, refresh success/failure, **refresh-reuse detection (token
+theft)**, and logout — each with actor, outcome and source IP. Auditing is
+best-effort and never blocks the auth path. These entries are queryable through
+the same audit API as incident mutations.
+
+### Tests
+Backend **297 pass** (+7 this round). Frontend `tsc -b` + `vite build` green.

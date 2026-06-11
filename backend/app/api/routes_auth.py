@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from app.api.auth import get_principal, optional_principal as _optional_principal_dep
-from app.core.errors import UnauthorizedError
+from app.core.errors import RateLimitedError, UnauthorizedError
 from app.rbac.policy import Principal
 
 try:  # PyJWT is optional at runtime
@@ -92,10 +92,51 @@ def _secret(request: Request) -> str:
     return configured or _DEMO_SECRET
 
 
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limit(request: Request, route: str) -> None:
+    """Enforce the always-on per-IP auth limiter for ``route``."""
+    limiter = request.app.state.ctx.auth_limiter
+    allowed, retry = limiter.check(f"{route}:{_client_ip(request)}")
+    if not allowed:
+        raise RateLimitedError(
+            "Too many authentication attempts",
+            retry_after=max(1, int(retry + 0.999)),
+        )
+
+
+async def _audit_auth(
+    request: Request, *, action: str, actor: str, outcome: str,
+    extra: dict | None = None,
+) -> None:
+    """Record an auth event in the audit log (best-effort; never blocks auth)."""
+    try:
+        meta = {"outcome": outcome, "ip": _client_ip(request)}
+        if extra:
+            meta.update(extra)
+        await request.app.state.ctx.audit.record(
+            actor=actor, action=action,
+            resource_type="auth", resource_id=actor,
+            metadata=meta,
+        )
+    except Exception:  # noqa: BLE001 - auditing must not break auth
+        pass
+
+
 @router.post("/login")
 async def login(body: LoginIn, request: Request) -> dict:
+    _rate_limit(request, "login")
     user = DEMO_USERS.get(body.email.lower())
     if user is None or body.password != DEMO_PASSWORD:
+        await _audit_auth(
+            request, action="auth.login", actor=body.email.lower(),
+            outcome="failure",
+        )
         raise UnauthorizedError("Invalid email or password")
 
     settings = request.app.state.ctx.settings
@@ -118,6 +159,10 @@ async def login(body: LoginIn, request: Request) -> dict:
     # Start a refresh-token family for silent renewal with rotation.
     refresh_token, _family = await request.app.state.ctx.refresh_tokens.issue(
         body.email.lower()
+    )
+    await _audit_auth(
+        request, action="auth.login", actor=body.email.lower(),
+        outcome="success", extra={"role": user["role"]},
     )
 
     return {
@@ -183,6 +228,7 @@ async def refresh(
     """
     from app.services.refresh_store import ReuseError
 
+    _rate_limit(request, "refresh")
     store = request.app.state.ctx.refresh_tokens
 
     if body.refresh_token:
@@ -190,13 +236,25 @@ async def refresh(
         try:
             rotated = await store.rotate(body.refresh_token)
         except ReuseError as exc:
+            await _audit_auth(
+                request, action="auth.refresh_reuse_detected",
+                actor=subject or "unknown", outcome="revoked",
+                extra={"family": exc.family_id},
+            )
             raise UnauthorizedError(
                 "Refresh token reuse detected; session revoked"
             ) from exc
         if rotated is None or subject is None:
+            await _audit_auth(
+                request, action="auth.refresh", actor=subject or "unknown",
+                outcome="failure",
+            )
             raise UnauthorizedError("Invalid or expired refresh token")
         new_refresh, _fam = rotated
         access = _mint_access_for_subject(request, subject)
+        await _audit_auth(
+            request, action="auth.refresh", actor=subject, outcome="success",
+        )
         return {
             "token": access,
             "refresh_token": new_refresh,
@@ -216,7 +274,13 @@ async def refresh(
 async def logout(request: Request, body: LogoutIn = LogoutIn()) -> dict:
     """Revoke the active refresh-token family so it cannot be rotated again."""
     if body.refresh_token:
-        await request.app.state.ctx.refresh_tokens.revoke_token(body.refresh_token)
+        store = request.app.state.ctx.refresh_tokens
+        subject = await store.subject_for(body.refresh_token)
+        await store.revoke_token(body.refresh_token)
+        await _audit_auth(
+            request, action="auth.logout", actor=subject or "unknown",
+            outcome="success",
+        )
     return {"ok": True}
 
 

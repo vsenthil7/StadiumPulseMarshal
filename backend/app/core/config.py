@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # --- Rate limiting ---
     rate_limit_enabled: bool = Field(default=False)
     rate_limit_per_minute: int = Field(default=120)
+    # Stricter, always-on limit for auth endpoints (login/refresh), per client
+    # IP, independent of the global limiter. Protects against credential
+    # stuffing / token-guessing even when the global limiter is disabled.
+    auth_rate_limit_per_minute: int = Field(default=10)
 
     # --- Webhooks ---
     webhook_timeout_seconds: float = Field(default=5.0)
@@ -86,6 +90,9 @@ class Settings(BaseSettings):
     # The entity-tag key that carries the zone name (default: "mz").
     venue_zone_map: str = Field(default="")
     venue_zone_tag_key: str = Field(default="mz")
+    # Map by *management-zone id* (stable across renames). Format:
+    # "12345=venue_arena_north,67890=venue_olympic_park".
+    venue_zone_id_map: str = Field(default="")
     # How often (seconds) to sweep expired/consumed/revoked refresh tokens.
     refresh_prune_interval_seconds: float = Field(default=3600.0)
 
@@ -93,6 +100,16 @@ class Settings(BaseSettings):
     def venue_zone_mapping(self) -> dict[str, str]:
         out: dict[str, str] = {}
         for pair in self.venue_zone_map.split(","):
+            pair = pair.strip()
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                out[k.strip()] = v.strip()
+        return out
+
+    @property
+    def venue_zone_id_mapping(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for pair in self.venue_zone_id_map.split(","):
             pair = pair.strip()
             if "=" in pair:
                 k, v = pair.split("=", 1)

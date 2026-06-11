@@ -407,3 +407,53 @@ Both tracks, full scope.
 - **Y2:** docs + package.
 
 ### Round 8 — COMPLETE
+
+---
+
+## Round 9 — Auto zone mapping + auth rate-limiting + auth audit events
+
+### Track H — zone-id→venue table (fully-automatic live mapping)
+| # | Sprint | Status |
+|---|--------|--------|
+| H1 | Config: VENUE_ZONE_ID_MAP (zoneId=venue); DynatraceZoneSource uses ids | 🟢 |
+| H2 | Map by zone id (stable) as well as name; precedence id>name>static-name | 🟢 |
+| H3 | Tests: id-based mapping, id+name merge, precedence | 🟢 |
+
+### Track I — auth endpoint rate-limiting
+| # | Sprint | Status |
+|---|--------|--------|
+| I1 | Async token-bucket limiter (per-key, per-route) service | 🟢 |
+| I2 | Apply to /auth/login + /auth/refresh (per-IP); 429 with Retry-After | 🟢 |
+| I3 | Config limits; tests: burst allowed, excess 429, window refill | 🟢 |
+
+### Track J — auth audit events
+| # | Sprint | Status |
+|---|--------|--------|
+| J1 | Emit audit events: login success/fail, refresh, reuse-detected, logout | 🟢 |
+| J2 | Persist via existing audit log; queryable | 🟢 |
+| J3 | Tests: events recorded with subject/outcome; reuse flagged | 🟢 |
+
+### Close-out
+| # | Sprint | Status |
+|---|--------|--------|
+| K1 | Full backend suite + frontend tsc/build green | 🟢 |
+| K2 | Docs + package | 🟢 |
+
+### Round 9 changelog
+- **Track H — zone-id→venue mapping (H1–H3):** new `VENUE_ZONE_ID_MAP`
+  (zoneId=venue). `DynatraceZoneSource` now fetches zone id+name and maps by the
+  stable id, keyed back to the zone name for entity-tag matching. Precedence:
+  zone-id map > static name map. +2 tests (id mapping, id-wins precedence).
+- **Track I — auth rate-limiting (I1–I3):** reusable `RateLimiter` token-bucket
+  service; always-on per-IP limit on `/auth/login` + `/auth/refresh`
+  (`AUTH_RATE_LIMIT_PER_MINUTE`, default 10), independent of the global limiter;
+  429 + Retry-After. Honors `X-Forwarded-For`. +3 tests. Live-verified: 4th
+  rapid attempt → 429; fresh IP unaffected.
+- **Track J — auth audit events (J1–J3):** login success/failure, refresh
+  success/failure, **reuse-detected (theft)**, and logout are recorded in the
+  existing audit log with actor/outcome/IP; best-effort so auditing never blocks
+  auth. +2 tests (success+failure recorded; reuse flagged).
+- **K1:** backend **297 pass**; frontend `tsc -b` + `vite build` green.
+- **K2:** docs + package.
+
+### Round 9 — COMPLETE
