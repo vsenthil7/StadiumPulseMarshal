@@ -41,10 +41,10 @@ async def test_silence_and_clear():
 @pytest.mark.asyncio
 async def test_ack_expiry():
     db = await _db()
-    s = SqlBurnAckStore(db, ack_ttl_seconds=0.05)
+    s = SqlBurnAckStore(db, ack_ttl_seconds=0.3)
     await s.acknowledge("SLO-X", "page", "alice")
     assert await s.ack_for("SLO-X", "page") is not None
-    time.sleep(0.1)
+    time.sleep(0.5)
     assert await s.ack_for("SLO-X", "page") is None
     await db.dispose()
 
