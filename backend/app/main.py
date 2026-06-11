@@ -20,6 +20,7 @@ log = get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     app.state.ctx = AppContext(settings)
+    await app.state.ctx.startup()
     log.info(
         "%s v%s started (data_source=%s, agent=%s)",
         settings.app_name,
@@ -50,6 +51,11 @@ def create_app() -> FastAPI:
     )
     app.include_router(router)
 
+    from app.api.routes_incidents import router as incidents_router
+    from app.api.routes_ops import router as ops_router
+
+    app.include_router(incidents_router)
+    app.include_router(ops_router)
 
     @app.websocket("/api/v1/stream")
     async def stream(ws: WebSocket) -> None:

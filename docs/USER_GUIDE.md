@@ -161,3 +161,57 @@ mock agent, and vice-versa.
 | `Gemini init failed … falling back to mock` | The `google-genai` SDK isn't installed or creds are invalid. Install `.[agent]` and verify the key/project. |
 | Apply button missing | The action must be **approved** first (or auto-approved by a guardrail). |
 | Execute returns 409 | Same — approve before applying. |
+
+---
+
+## 10. Phase 2 — Incidents, Reliability & Scenarios (tabs)
+
+The console is organised into four tabs in the top bar.
+
+### Triage
+The original single-screen triage view (Section 3–5): feed, root cause, agent
+analysis, human-in-the-loop remediation.
+
+### Incidents
+Turn a detected problem into a tracked **incident** with a full lifecycle.
+
+1. Open the **Incidents** tab.
+2. Under *Create incident from open problem*, click **Open incident** next to a
+   problem.
+3. The incident detail shows its state, escalation tier, assignee and a
+   timeline.
+4. Use the **→ STATE** buttons to advance the lifecycle (Acknowledge →
+   Investigate → Mitigate → Resolve). Illegal transitions are blocked.
+5. **Escalate** applies the escalation policy for the incident's age/severity
+   and pages the on-call engineer; the page is recorded on the timeline and in
+   notifications.
+
+### Reliability
+
+![Reliability](screenshots/04-reliability.svg)
+
+*Figure 4.* Shows **error budgets** for each SLO with a burn-state badge
+(Healthy / Slow burn / Fast burn / Budget exhausted) and the burn rate, plus
+**operational analytics**: MTTR, MTTA, incident counts and breakdowns by
+severity, state and venue.
+
+> Burn rate is the current error rate divided by the rate that would exactly
+> exhaust the budget over the SLO window. A burn rate of 3× means you'd exhaust
+> the budget in a third of the window — surfaced as a fast burn even while most
+> of the budget remains.
+
+### Scenarios
+Switch the active matchday situation (payment DB saturation, CDN edge failure,
+network partition, Kubernetes OOM) across three venues. Selecting a scenario
+updates the problem feed, root-cause data and SLOs across every tab.
+
+---
+
+## 11. Persistence & authentication (operations)
+
+- **Persistence.** By default the app runs in-memory. Set `DATABASE_URL`
+  (e.g. `sqlite+aiosqlite:///stadiumpulse.db`) to persist incidents,
+  remediations, audit and notifications durably. No code change required.
+- **Authentication.** Set `AUTH_ENABLED=true` plus `API_KEY` and/or
+  `JWT_SECRET`. Then send `X-API-Key: <key>` or `Authorization: Bearer <jwt>`
+  on API calls. Left off by default for the demo.

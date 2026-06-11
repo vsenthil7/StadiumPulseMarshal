@@ -11,9 +11,18 @@ log = get_logger(__name__)
 
 
 def build_observability_client(settings: Settings) -> ObservabilityClient:
-    """Return a live Dynatrace client if configured, else the mock client."""
+    """Choose the observability client.
+
+    Priority when live: a full MCP JSON-RPC client if an MCP URL is configured,
+    else the Dynatrace Environment API v2 client. Falls back to mock otherwise.
+    """
     if settings.dynatrace_live:
-        log.info("Using live Dynatrace MCP client")
+        if settings.dt_mcp_url:
+            from app.mcp.dynatrace_mcp_adapter import DynatraceMCPProtocolClient
+
+            log.info("Using live Dynatrace MCP (JSON-RPC) client")
+            return DynatraceMCPProtocolClient.create(settings)
+        log.info("Using live Dynatrace Environment API client")
         return DynatraceMCPClient.create(settings)
     log.warning("Dynatrace credentials absent or mocks forced — using mock client")
     return MockMCPClient()

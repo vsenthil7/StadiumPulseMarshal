@@ -63,3 +63,65 @@ export const api = {
   getAudit: () =>
     http<{ decisions: ApprovalDecision[] }>('/audit').then((r) => r.decisions),
 };
+
+// --- Phase 2 API ---
+import type {
+  AnalyticsSummary,
+  ErrorBudget,
+  Incident,
+  IncidentState,
+  NotificationItem,
+  Page,
+  ScenarioInfo,
+} from '../types';
+
+export const apiExt = {
+  listIncidents: (params: { openOnly?: boolean; venueId?: string; offset?: number; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.openOnly) q.set('open_only', 'true');
+    if (params.venueId) q.set('venue_id', params.venueId);
+    q.set('offset', String(params.offset ?? 0));
+    q.set('limit', String(params.limit ?? 50));
+    return http<{ incidents: Incident[]; page: Page }>(`/incidents?${q.toString()}`);
+  },
+  createIncident: (problemId: string, venueId?: string) =>
+    http<{ incident: Incident }>('/incidents', {
+      method: 'POST',
+      body: JSON.stringify({ problem_id: problemId, venue_id: venueId }),
+    }).then((r) => r.incident),
+  getIncident: (id: string) =>
+    http<{ incident: Incident }>(`/incidents/${id}`).then((r) => r.incident),
+  transition: (id: string, target: IncidentState, actor: string, note = '') =>
+    http<{ incident: Incident }>(`/incidents/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ target, actor, note }),
+    }).then((r) => r.incident),
+  assign: (id: string, assignee: string, actor: string) =>
+    http<{ incident: Incident }>(`/incidents/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ assignee, actor }),
+    }).then((r) => r.incident),
+  addNote: (id: string, note: string, actor: string) =>
+    http<{ incident: Incident }>(`/incidents/${id}/note`, {
+      method: 'POST',
+      body: JSON.stringify({ note, actor }),
+    }).then((r) => r.incident),
+  escalate: (id: string) =>
+    http<{ incident: Incident }>(`/incidents/${id}/escalate`, { method: 'POST' }).then(
+      (r) => r.incident,
+    ),
+  getSLO: () => http<{ budgets: ErrorBudget[] }>('/slo').then((r) => r.budgets),
+  getAnalytics: () =>
+    http<{ summary: AnalyticsSummary }>('/analytics').then((r) => r.summary),
+  getNotifications: () =>
+    http<{ notifications: NotificationItem[] }>('/notifications').then(
+      (r) => r.notifications,
+    ),
+  getScenarios: () =>
+    http<{ scenarios: ScenarioInfo[]; active: string }>('/scenarios'),
+  selectScenario: (key: string) =>
+    http<{ scenarios: ScenarioInfo[]; active: string }>('/scenarios/select', {
+      method: 'POST',
+      body: JSON.stringify({ key }),
+    }),
+};

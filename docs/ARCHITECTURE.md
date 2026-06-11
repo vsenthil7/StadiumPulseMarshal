@@ -91,3 +91,73 @@ selects and explains rather than fabricates.
 - **E2E:** Playwright specs across desktop + mobile projects (see
   `E2E_TESTING.md`). The single-origin stack they drive is validated by an HTTP
   smoke test.
+
+---
+
+## Phase 2 — Enterprise Depth
+
+Phase 2 extends the vertical slice into an operations platform. New, strictly
+modular subsystems:
+
+### Domain (`app/models/`)
+- `slo.py` — SLI / SLO / SLOMeasurement / ErrorBudget with burn-state.
+- `incident.py` — Incident with a validated lifecycle state machine
+  (`DETECTED → ACKNOWLEDGED → INVESTIGATING → MITIGATING → RESOLVED → POSTMORTEM
+  → CLOSED`), escalation tiers, and a timeline.
+- `notification.py` — on-call engineers, escalation policies, notifications.
+- `venue.py` — venues, matches, matchday context (multi-venue).
+
+### Persistence (`app/repositories/`)
+Repository pattern with two interchangeable backends behind one factory:
+in-memory and SQLAlchemy/SQLite (async). Services depend only on the interfaces
+(`base.py`); the same contract tests pass against both backends.
+
+### MCP protocol (`app/mcp/`)
+- `protocol.py` — a real MCP JSON-RPC 2.0 client: `initialize`, `tools/list`,
+  `tools/call`, content extraction, typed errors.
+- `dynatrace_mcp_adapter.py` — uses the MCP session to satisfy
+  `ObservabilityClient`, mapping tool results into the domain. The factory now
+  prefers MCP-protocol → Environment-API → mock.
+
+### Services (`app/services/`)
+- `slo_engine.py` — error-budget + **burn-rate** computation. Burn rate is the
+  current error rate over a short observation window divided by the
+  budget-neutral rate, so fast/slow burn is detected before cumulative
+  exhaustion. Classification is ordered by urgency (fast burn first).
+- `incident_service.py` — orchestrates lifecycle, assignment, escalation and
+  notification dispatch, and links remediation decisions onto the timeline.
+- `escalation_engine.py` — policy-driven tier escalation + on-call routing.
+- `notification_service.py` — builds and dispatches notifications.
+- `analytics.py` — MTTR/MTTA and breakdowns by severity/state/venue.
+- `ops_defaults.py` — default escalation policies, on-call roster, synthetic SLO
+  measurements for mock mode.
+
+### Scenarios (`app/fixtures/scenarios/`)
+Four selectable matchday scenarios (payment DB saturation, CDN edge failure,
+network partition, k8s OOM) across three venues, behind a registry. The mock
+observability client is scenario-aware and switchable at runtime.
+
+### API additions (`/api/v1`)
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/incidents` | List (paginated) / create from a problem. |
+| GET | `/incidents/{id}` | Fetch one. |
+| POST | `/incidents/{id}/transition` | Lifecycle change (409 on illegal). |
+| POST | `/incidents/{id}/assign` `/note` `/escalate` | Ops actions. |
+| GET | `/slo` | Error budgets with burn state. |
+| GET | `/analytics` | Operational metrics. |
+| GET | `/notifications` | Dispatched notifications (optionally by incident). |
+| GET/POST | `/scenarios` `/scenarios/select` | List / switch scenario. |
+
+Auth: when `auth_enabled`, all routes require an `X-API-Key` or a valid Bearer
+JWT (`jwt_secret`). Pagination via `offset`/`limit`.
+
+### Frontend
+Refactored into a tab shell (`App.tsx`) plus page modules
+(`pages/TriagePage`, `IncidentsPage`, `ReliabilityPage`, `ScenariosPage`) and new
+components (`SLODashboard`, `AnalyticsPanel`, `ScenarioSwitcher`,
+`IncidentLifecycle`).
+
+### Testing
+**135 tests, 100% backend statement coverage**, including a parametrised
+repository contract suite run against both persistence backends.

@@ -124,3 +124,93 @@ See `docs/ACCESS_REQUIREMENTS.md`. Status: 🔵 awaiting credentials — **mock 
 | 2026-06-01 14:45 | S8 | Playwright specs (desktop+mobile) authored; stack validated via HTTP smoke test. |
 | 2026-06-01 14:50 | S9 | User guide + screenshots, architecture + diagram, README. |
 | 2026-06-01 14:56 | S10 | Docker + Cloud Run + scripts; repo packaged. Build complete. |
+
+---
+
+## Phase 2 — Enterprise Depth (S11–S18)
+
+Goal: move from a working vertical slice to a genuinely enterprise-grade system —
+persistence, SLO/error-budget engine, full incident lifecycle, escalation &
+on-call routing, real MCP JSON-RPC protocol layer, multi-venue/multi-scenario,
+auth, pagination/filtering, analytics, notifications. Strictly modular.
+
+| Phase | Name | Sprint | Status |
+|---|---|---|---|
+| P11 | Domain depth (SLO, incident lifecycle, notifications) | S11 | 🟢 |
+| P12 | Persistence (repository pattern: memory + SQLite) | S12 | 🟢 |
+| P13 | Real MCP JSON-RPC protocol client | S13 | 🟢 |
+| P14 | SLO engine + incident service + escalation/on-call | S14 | 🟢 |
+| P15 | Multi-scenario / multi-venue fixtures | S15 | 🟢 |
+| P16 | API expansion (incidents, SLO, analytics, auth, paging) | S16 | 🟢 |
+| P17 | Frontend expansion (SLO dash, incidents, analytics, venues) | S17 | 🟢 |
+| P18 | Tests (100% backend) + E2E + docs | S18 | 🟢 |
+
+### S11 — Domain depth ⚪
+- [ ] SLO, SLI, ErrorBudget, ServiceLevel models
+- [ ] Incident lifecycle: state machine (DETECTED→ACK→INVESTIGATING→MITIGATING→RESOLVED→POSTMORTEM)
+- [ ] IncidentEvent timeline, assignment, escalation tiers
+- [ ] Notification + channel models; OnCallEngineer, EscalationPolicy
+- [ ] Venue, Match, MatchdayContext models (multi-venue)
+**Acceptance:** models validate; state transitions enforced; unit tests.
+
+### S12 — Persistence ⚪
+- [ ] Repository interfaces (incidents, remediations, audit, SLO, notifications)
+- [ ] In-memory repos + SQLite/SQLAlchemy repos behind one factory
+- [ ] Unit-of-work / session management; migrations-lite (create_all)
+**Acceptance:** both backends pass the same repository contract tests.
+
+### S13 — Real MCP JSON-RPC client ⚪
+- [ ] MCP session: initialize, tools/list, tools/call (JSON-RPC 2.0)
+- [ ] Dynatrace MCP adapter mapping tool results → domain
+- [ ] Transport abstraction (httpx) + mock transport for tests
+**Acceptance:** protocol round-trips against mock transport; mapped to domain.
+
+### S14 — SLO engine + incident service + escalation ⚪
+- [ ] SLO engine: error-budget burn rate, fast/slow burn alerts
+- [ ] Incident service orchestrating lifecycle + remediation + notifications
+- [ ] Escalation policy engine + on-call routing
+**Acceptance:** burn computed correctly; escalation fires per policy; tested.
+
+### S15 — Multi-scenario / multi-venue fixtures ⚪
+- [ ] Scenarios: payment DB saturation, CDN edge, network partition, k8s OOM, auth surge
+- [ ] Multiple venues/matches; scenario registry + selector
+**Acceptance:** each scenario loads; selectable; covered by tests.
+
+### S16 — API expansion ⚪
+- [ ] Incident endpoints (lifecycle actions), SLO endpoints, analytics endpoints
+- [ ] Notifications endpoints; venue/match selection
+- [ ] Auth (API key + optional JWT), pagination, filtering, sorting
+**Acceptance:** OpenAPI renders; all endpoints tested incl. auth + paging.
+
+### S17 — Frontend expansion ⚪
+- [ ] SLO dashboard (error budgets, burn) — modular components
+- [ ] Incident lifecycle view + timeline + assignment/escalation
+- [ ] Analytics charts (MTTR, incidents by phase/severity)
+- [ ] Notifications panel; venue/match switcher
+**Acceptance:** renders against expanded API; responsive; modular files.
+
+### S18 — Tests + docs ⚪
+- [ ] Backend 100% coverage maintained across new modules
+- [ ] Extended E2E specs; updated user guide + architecture + screenshots
+**Acceptance:** pytest 100%; docs current.
+
+| 2026-06-01 15:14 | S11–S12 | Domain depth (SLO, incident lifecycle, on-call, venue) + repository pattern (memory + SQLite) — contract verified on both backends. |
+| 2026-06-01 15:14 | S13–S14 | Real MCP JSON-RPC client (initialize/list/call) + SLO engine + incident service + escalation/on-call + notifications — all verified. |
+| 2026-06-01 15:14 | S15 | 4 scenarios (payment DB, CDN edge, network partition, k8s OOM) across 3 venues + scenario registry + analytics service. Existing 66 tests still green (no regression). |
+
+### Status note (Phase 2 in progress)
+Backend enterprise depth S11–S15 **complete and verified**; existing 66-test
+suite remains green. Remaining: **S16** (wire incidents/SLO/analytics/notifications
+endpoints + auth + pagination into the API), **S17** (frontend: SLO dashboard,
+incident lifecycle view, analytics, venue/scenario switcher — modular files),
+**S18** (extend tests to 100% over new modules, E2E, docs, repackage zip).
+| 2026-06-01 15:27 | S16 | API expanded: incident lifecycle routes, SLO/analytics/notifications/scenario routes, API-key + JWT auth, pagination. Auth + all flows verified; 66 original tests still green. |
+| 2026-06-01 15:27 | S17 | Frontend modularised into tab shell + 4 pages (Triage/Incidents/Reliability/Scenarios) and 4 new components (SLO dashboard, analytics, scenario switcher, incident lifecycle). Build clean (45 modules); full stack verified over HTTP. |
+| 2026-06-01 15:58 | S18a | Fixed SLO burn-rate model (window-relative burn vs cumulative consumed); reordered classification by urgency. Backend back to 100% coverage — 135 tests passing. |
+| 2026-06-01 15:58 | S18 | Phase 2 complete: 135 tests @ 100% backend coverage; Playwright Phase-2 specs (tabs/reliability/incidents/scenarios) authored; docs + reliability screenshot added; deps + env updated; repo repackaged. |
+
+### Phase 2 — COMPLETE
+All depth sprints S11–S18 delivered and verified. Backend: 135 tests, 100%
+coverage. Frontend: 45-module build clean. SLO burn-rate model corrected and
+validated. E2E specs authored (browser binary download blocked in this sandbox;
+run on Desktop/CI). Persistence verified on both in-memory and SQLite backends.

@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     auto_approve_low_risk: bool = Field(default=False)
     max_auto_approve_severity: str = Field(default="LOW")
 
+    # --- Persistence ---
+    # e.g. "sqlite+aiosqlite:///stadiumpulse.db"; empty => in-memory.
+    database_url: str | None = None
+
+    # --- Auth ---
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    auth_enabled: bool = Field(default=False)
+
     @property
     def dynatrace_live(self) -> bool:
         """True when live Dynatrace calls are possible and not force-mocked."""

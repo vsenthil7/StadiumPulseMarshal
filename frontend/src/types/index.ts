@@ -99,3 +99,94 @@ export interface TimelineEntry {
   starts_at: string;
   expected_load_multiplier: number;
 }
+
+// --- Phase 2 types ---
+export type IncidentState =
+  | 'DETECTED'
+  | 'ACKNOWLEDGED'
+  | 'INVESTIGATING'
+  | 'MITIGATING'
+  | 'RESOLVED'
+  | 'POSTMORTEM'
+  | 'CLOSED';
+
+export type EscalationTier = 'TIER1' | 'TIER2' | 'TIER3';
+export type BurnState = 'HEALTHY' | 'SLOW_BURN' | 'FAST_BURN' | 'EXHAUSTED';
+
+export interface IncidentEvent {
+  type: string;
+  at: string;
+  actor: string;
+  detail: string;
+  data: Record<string, unknown>;
+}
+
+export interface Incident {
+  id: string;
+  problem_id: string;
+  title: string;
+  severity: Severity;
+  state: IncidentState;
+  tier: EscalationTier;
+  assignee: string | null;
+  venue_id: string | null;
+  match_id: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  timeline: IncidentEvent[];
+  remediation_ids: string[];
+  impact_summary: string;
+}
+
+export interface Page {
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface ErrorBudget {
+  slo_id: string;
+  slo_name: string;
+  target: number;
+  achieved: number;
+  consumed_fraction: number;
+  remaining_fraction: number;
+  burn_rate: number;
+  state: BurnState;
+  computed_at: string;
+}
+
+export interface AnalyticsSummary {
+  total_incidents: number;
+  open_incidents: number;
+  resolved_incidents: number;
+  mttr_minutes: number | null;
+  mtta_minutes: number | null;
+  by_severity: Record<string, number>;
+  by_state: Record<string, number>;
+  by_venue: Record<string, number>;
+  slo_breaching: number;
+  slo_total: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  incident_id: string;
+  channel: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: string;
+  created_at: string;
+  sent_at: string | null;
+}
+
+export interface ScenarioInfo {
+  key: string;
+  name: string;
+  description: string;
+  venue: string;
+  match: string;
+  severity: Severity;
+}

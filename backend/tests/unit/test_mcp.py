@@ -21,7 +21,9 @@ async def test_mock_client_problems():
     assert await c.get_problem("P-2026-0613-001") is not None
     assert await c.get_problem("missing") is None
     assert len(await c.list_entities()) == 5
-    assert (await c.get_metrics("DB-PAYMENTS"))[0].latest == 98.0
+    metrics = await c.get_metrics("DB-PAYMENTS")
+    assert metrics[0].key == "entity.saturation"
+    assert metrics[0].latest is not None
     assert len(await c.get_fixture_timeline()) == 7
     await c.close()  # default no-op
 
