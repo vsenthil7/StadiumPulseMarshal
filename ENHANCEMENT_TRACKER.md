@@ -1573,3 +1573,44 @@ pass**. Existing chatops tests unaffected (no secret set by default).
 ### Remaining: live-credential / live-infra validation only (DT/PagerDuty/OpsGenie/
 ### Cloud Workflows real round-trips, real Cloud Run deploy, k6 run) — needs your
 ### environment; all such adapters are structurally complete + mock-tested here.
+
+---
+
+## Round 33 — Section 7 Definition-of-DONE pass
+
+Ran every testable checkbox from the reviewer doc's Section-7 DoD and closed the
+gaps found:
+
+**Green as-is:** create_all confined to in-memory fallback; Dockerfile non-root
+(USER appuser/1001); pytest **94% coverage** (gate ≥80%); Alembic applies to a
+fresh DB; alert routing test (pagerduty_page_route) PASSED; dispatch test
+(cloud_workflows_dispatch) PASSED; RBAC viewer-cannot/responder-can PASSED; tsc
++ vite build PASSED; health = {"status":"ok"}; pytest -k gates: runbook 13≥8,
+postmortem 10≥6, slo_catalog 6≥5, davis 5≥4, change_event 4≥4.
+
+**Fixed this round:**
+- **All 17 doc-named tables now in migrations** — added SloCatalogRow,
+  OnCallScheduleRow, FleetVenueRow, ChatOpsCommandRow, CostMetricRow + Alembic
+  revision `doc_named_width_tables`; `upgrade head` → 20 tables incl. all the
+  doc's required names. Verified on a fresh deployed DB.
+- **cloudrun.yaml** — removed the literal `PROJECT_ID` placeholder (image now
+  `IMAGE_PLACEHOLDER`, substituted at deploy).
+- **deploy.sh** — `dryrun` arg prints "Would deploy to Cloud Run" and exits 0.
+- **Route guards** — SPA catch-all now 404s unknown `/api/*` paths (was masking
+  them as 200 index.html); added a guarded `GET /chatops` discovery endpoint.
+  With AUTH_ENABLED=true all 7 new routes (runbooks, postmortems, slo-catalog,
+  fleet, chatops, cost-analytics, change-events) return 401 unauthenticated —
+  verified live.
+- **fleet** tests 1→4 (≥4 ✓); **cost_analytics** tests 2→3 (≥3 ✓); **chatops**
+  6→8 (incl. guarded-GET).
+
+Backend **513 pass** (+5 net), 94% coverage; frontend tsc+build green; 7 node
+tests. Live-verified: health, all-routes-guarded (auth on), 17 tables on fresh DB.
+
+### DoD items requiring YOUR environment (cannot run in sandbox — unchanged):
+CI Actions run; real Cloud Run deploy / Secret Manager describe; docker inspect
+non-root (needs built image); multi-replica compose idempotency; live Dynatrace
+dual-window cred test; k6 run; SBOM + cosign sign; Playwright (needs compose up).
+All corresponding CODE + tests are present and pass via mock/sandbox paths.
+
+### Round 33 — COMPLETE

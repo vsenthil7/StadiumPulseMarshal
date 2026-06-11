@@ -9,6 +9,12 @@ TAG="${1:-$(git rev-parse --short HEAD 2>/dev/null || echo latest)}"
 IMAGE="gcr.io/${PROJECT_ID}/stadiumpulse-marshal:${TAG}"
 SERVICE="stadiumpulse-marshal"
 
+if [ "${TAG}" = "dryrun" ]; then
+  echo "Would deploy to Cloud Run: service=${SERVICE} region=${REGION} image=gcr.io/${PROJECT_ID}/stadiumpulse-marshal:<tag>"
+  echo "Secrets bound from Secret Manager: DT_API_TOKEN GOOGLE_API_KEY PAGERDUTY_ROUTING_KEY OPSGENIE_API_KEY JWT_SECRET"
+  exit 0
+fi
+
 echo ">> Building ${IMAGE}"
 docker build -t "${IMAGE}" .
 echo ">> Pushing ${IMAGE}"

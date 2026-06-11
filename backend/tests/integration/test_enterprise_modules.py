@@ -75,3 +75,47 @@ def test_fleet_summary():
         body = r.json()
         # either per-venue rows or a global summary fallback
         assert "venues" in body
+
+
+# ── fleet (expand to >=4 for DoD) ────────────────────────────────────────────
+def test_fleet_requires_auth():
+    with TestClient(create_app()) as c:
+        c.app.state.ctx.settings.auth_enabled = True
+        try:
+            r = c.get("/api/v1/fleet")
+            assert r.status_code in (401, 403)
+        finally:
+            c.app.state.ctx.settings.auth_enabled = False
+
+
+def test_fleet_shape_keys():
+    with TestClient(create_app()) as c:
+        body = c.get("/api/v1/fleet", headers=_h(c, "sre@stadiumpulse.demo")).json()
+        assert "venues" in body
+        if body["venues"]:
+            row = body["venues"][0]
+            for k in ("venue_id", "open_incidents", "total_incidents", "slo_breaching"):
+                assert k in row
+
+
+def test_fleet_viewer_allowed():
+    with TestClient(create_app()) as c:
+        r = c.get("/api/v1/fleet", headers=_h(c, "viewer@arena-north.demo"))
+        assert r.status_code == 200
+
+
+# ── cost_analytics (expand to >=3 for DoD) ───────────────────────────────────
+def test_cost_analytics_requires_auth():
+    with TestClient(create_app()) as c:
+        c.app.state.ctx.settings.auth_enabled = True
+        try:
+            assert c.get("/api/v1/cost-analytics").status_code in (401, 403)
+        finally:
+            c.app.state.ctx.settings.auth_enabled = False
+
+
+def test_cost_analytics_totals_match_services():
+    with TestClient(create_app()) as c:
+        body = c.get("/api/v1/cost-analytics", headers=_h(c)).json()
+        summed = round(sum(s["monthly_cost_usd"] for s in body["services"]), 2)
+        assert abs(summed - body["total_monthly_cost_usd"]) < 0.01

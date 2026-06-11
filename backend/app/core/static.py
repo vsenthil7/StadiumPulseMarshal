@@ -52,6 +52,11 @@ def mount_frontend(app: FastAPI) -> bool:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def _spa(full_path: str, request: Request):  # pragma: no cover
+        # Never let unknown API paths fall through to the SPA shell — that would
+        # mask missing/guarded endpoints as 200. Return a real 404 for them.
+        if full_path.startswith("api/"):
+            from starlette.responses import JSONResponse
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
         candidate = dist / full_path
         if candidate.is_file():
             return FileResponse(candidate)

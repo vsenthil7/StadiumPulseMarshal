@@ -134,6 +134,47 @@ class DavisFeedbackRow(Base):
     document: Mapped[dict] = mapped_column(JSON)
 
 
+class SloCatalogRow(Base):
+    """Optional persisted SLO catalog entries (the live catalog is served from
+    the SLO engine; this table lets operators store curated catalog metadata)."""
+    __tablename__ = "slo_catalog"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    service_id: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class OnCallScheduleRow(Base):
+    __tablename__ = "on_call_schedules"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    tier: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class FleetVenueRow(Base):
+    """Persisted fleet venue registry (live rollups are computed from analytics;
+    this stores venue metadata / enrolment)."""
+    __tablename__ = "fleet_venues"
+    venue_id: Mapped[str] = mapped_column(String, primary_key=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class ChatOpsCommandRow(Base):
+    __tablename__ = "chatops_commands"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, index=True)
+    command: Mapped[str] = mapped_column(String, index=True)
+    at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
+class CostMetricRow(Base):
+    __tablename__ = "cost_metrics"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    service_id: Mapped[str] = mapped_column(String, index=True)
+    captured_at: Mapped[str] = mapped_column(String, index=True)
+    document: Mapped[dict] = mapped_column(JSON)
+
+
 class Database:
     """Holds the engine + session factory and creates tables on init."""
 

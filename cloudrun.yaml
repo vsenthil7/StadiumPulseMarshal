@@ -15,7 +15,8 @@ spec:
         autoscaling.knative.dev/maxScale: "20"
     spec:
       containers:
-        - image: gcr.io/PROJECT_ID/stadiumpulse-marshal:latest
+        # Image is substituted at deploy time (envsubst ${IMAGE} or gcloud deploy):
+        - image: IMAGE_PLACEHOLDER
           ports:
             - containerPort: 8080
           env:

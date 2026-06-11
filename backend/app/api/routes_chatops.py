@@ -14,13 +14,31 @@ endpoint stays testable without a secret while being secure in production.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from app.api.auth import require_permission
 from app.core.logging import get_logger
+from app.rbac.policy import Permission
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/chatops", tags=["chatops"])
+
+
+@router.get("")
+async def chatops_info(
+    request: Request,
+    _p=Depends(require_permission(Permission.INCIDENT_READ)),
+) -> dict:
+    """Authenticated discovery endpoint describing the ChatOps surface.
+    (The Slack command handler itself is POST /chatops/slack/command, secured by
+    HMAC.) This guarded GET ensures no unauthenticated access to the namespace."""
+    return {
+        "slack_command": "/api/v1/chatops/slack/command",
+        "subcommands": ["status", "incident <id>", "runbook <id> [execute]", "help"],
+        "hmac_required": bool(getattr(request.app.state.ctx.settings,
+                                      "slack_signing_secret", None)),
+    }
 
 
 def _help() -> dict:

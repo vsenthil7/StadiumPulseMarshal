@@ -46,3 +46,22 @@ def test_incident_not_found():
     with TestClient(create_app()) as c:
         r = _cmd(c, "incident INC-doesnotexist")
         assert "not found" in r.json()["text"]
+
+
+def test_chatops_info_guarded():
+    """GET /chatops requires auth when auth is enabled (DoD route-guard)."""
+    with TestClient(create_app()) as c:
+        c.app.state.ctx.settings.auth_enabled = True
+        try:
+            assert c.get("/api/v1/chatops").status_code in (401, 403)
+        finally:
+            c.app.state.ctx.settings.auth_enabled = False
+
+
+def test_chatops_info_authenticated():
+    with TestClient(create_app()) as c:
+        tok = c.post("/api/v1/auth/login",
+                     json={"email": "viewer@arena-north.demo",
+                           "password": "MatchdayDemo123!"}).json()["token"]
+        r = c.get("/api/v1/chatops", headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 200 and "slack_command" in r.json()
